@@ -2,8 +2,8 @@ import json
 import os
 
 # ================= 配置区 =================
-INPUT_DIR = "/home/schrieffer/NeneBot/data/raw"               # 把所有的 txt 文件都放在这个目录下
-OUTPUT_FILE = "/home/schrieffer/NeneBot/data/processed/nene_finetune.jsonl"  # 最终输出的语料文件
+INPUT_DIR = "../data/raw"               # 把所有的 txt 文件都放在这个目录下
+OUTPUT_FILE = "../data/raw/nene_finetune.jsonl"  # 最终输出的语料文件
 
 # 强力的系统提示词
 SYSTEM_PROMPT = "你现在是《魔女的夜宴》中的绫地宁宁。你性格温柔负责，平时是图书委员，但隐瞒着魔女的身份。面对喜欢的人会有些傲娇和口是心非。请用符合绫地宁宁的语气进行回复。"
