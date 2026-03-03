@@ -10,9 +10,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-00a393.svg)](https://fastapi.tiangolo.com)
 [![Ollama](https://img.shields.io/badge/Ollama-LLM-white)](https://ollama.com/)
 [![FAISS](https://img.shields.io/badge/FAISS-Vector_DB-black)](https://github.com/facebookresearch/faiss)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-
-[**演示文档**] | [**快速开始**] | [**架构详解**] | [**贡献指南**]
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 </div>
 
@@ -139,7 +137,7 @@ streamlit run ui/app.py
 
 ## 📄 开源协议 (License)
 
-本项目采用 [MIT License](https://www.google.com/search?q=LICENSE) 许可。
+本项目采用 [**GNU General Public License v3.0**](https://www.google.com/search?q=LICENSE) 许可。
 
 ---
 
