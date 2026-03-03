@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     embedding_model_name: str = "BAAI/bge-small-zh-v1.5"
     vector_dim: int = 512  # Dimensionality of bge-small-zh-v1.5 outputs
 
+    # Ollama LLM Settings
+    ollama_base_url: str = "http://127.0.0.1:11434" 
+    llm_model_name: str = "qwen2.5"                 
+
     # Storage Paths
     data_path: str = str(PROJECT_ROOT / "data" / "raw" / "train.jsonl")  # Make sure the extension matches your actual file
     vector_index_path: str = str(PROJECT_ROOT / "vector_store" / "faiss_index.bin")

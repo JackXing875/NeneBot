@@ -1,95 +1,116 @@
+"""Script to convert raw character scripts into JSONL dialogue dataset for fine-tuning.
+
+This script processes all `.txt` files in the input directory, extracts user and assistant
+dialogues based on speaker tags, and outputs a JSONL file suitable for LLM fine-tuning.
+"""
+
 import json
 import os
 
-# ================= 配置区 =================
-INPUT_DIR = "../data/raw"               # 把所有的 txt 文件都放在这个目录下
-OUTPUT_FILE = "../data/raw/nene_finetune.jsonl"  # 最终输出的语料文件
+# ================= CONFIGURATION =================
+INPUT_DIR = "../data/raw"  # Directory containing all raw txt scripts
+OUTPUT_FILE = "../data/raw/nene_finetune.jsonl"  # Output JSONL dataset file
 
-# 强力的系统提示词
-SYSTEM_PROMPT = "你现在是《魔女的夜宴》中的绫地宁宁。你性格温柔负责，平时是图书委员，但隐瞒着魔女的身份。面对喜欢的人会有些傲娇和口是心非。请用符合绫地宁宁的语气进行回复。"
+# Strong system prompt for the assistant
+SYSTEM_PROMPT = (
+    "You are Ayachi Nene from 'The Witch's Banquet'. "
+    "You are gentle and responsible, usually a library committee member, "
+    "but secretly a witch. You are soft-spoken to people you like, "
+    "and sometimes shy or tsundere. Please respond in Nene's tone."
+)
 
-USER_NAMES = ["柊史", "保科柊史", "男主"]
-ASSISTANT_NAMES = ["宁宁", "绫地宁宁", "綾地寧々"]
-# ==========================================
+# Recognized speaker names
+USER_NAMES = ["Hiiragi Fumi", "Hiroshi Hiiragi", "Protagonist"]
+ASSISTANT_NAMES = ["Nene", "Ayachi Nene", "綾地寧々"]
+# ================================================
 
-def process_all_scripts():
+
+def process_scripts():
+    """Process all txt scripts in INPUT_DIR and save them as a JSONL dataset."""
     dataset = []
     total_files = 0
-    
-    # 检查输入文件夹是否存在
+
     if not os.path.exists(INPUT_DIR):
-        print(f"请先创建 {INPUT_DIR} 文件夹，并放入 txt 剧本文件！")
+        print(f"Please create {INPUT_DIR} and put your txt script files there.")
         return
 
-    # 遍历目录下的所有 txt 文件
     for filename in os.listdir(INPUT_DIR):
-        if not filename.endswith('.txt'):
+        if not filename.endswith(".txt"):
             continue
-            
+
         filepath = os.path.join(INPUT_DIR, filename)
         total_files += 1
-        print(f"正在处理文件: {filename} ...")
-        
-        # 每个文件开始时，重置状态机，避免跨文件上下文污染
+        print(f"Processing file: {filename} ...")
+
         current_speaker = None
         last_user_text = None
-        
+
         lines = []
-        # 按优先级尝试常见的编码格式（gb18030 是 gbk 的超集，非常适合读汉化组的文本）
-        for enc in ['utf-8', 'gb18030', 'shift_jis']:
+
+        # Try common encodings to read the file
+        for encoding in ["utf-8", "gb18030", "shift_jis"]:
             try:
-                with open(filepath, 'r', encoding=enc) as f:
+                with open(filepath, "r", encoding=encoding) as f:
                     lines = f.readlines()
-                print(f"  -> 成功使用 {enc} 编码解析。")
+                print(f"  -> Successfully read with {encoding} encoding.")
                 break
             except UnicodeDecodeError:
                 continue
-                
+
         if not lines:
-            print(f"  -> [报错] 穷尽了所有常见编码，仍无法读取 {filename}，请检查文件是否损坏！")
+            print(
+                f"  -> [ERROR] Could not read {filename} with common encodings. "
+                "Please check if the file is corrupted."
+            )
             continue
 
         for line in lines:
             line = line.strip()
-            
-            if line.startswith(';['):
-                parts = line.split(']', 1)
-                if len(parts) < 2: 
+
+            if line.startswith(";["):
+                parts = line.split("]", 1)
+                if len(parts) < 2:
                     continue
-                    
+
                 content = parts[1].strip()
-                if not content: 
+                if not content:
                     continue
-                
-                # 状态机逻辑
+
+                # State machine logic
                 if content in USER_NAMES or content in ASSISTANT_NAMES:
                     current_speaker = content
-                    
-                elif content.startswith('「') and content.endswith('」'):
-                    dialogue = content.strip('「」')
-                    
+
+                elif content.startswith("「") and content.endswith("」"):
+                    dialogue = content.strip("「」")
+
                     if current_speaker in USER_NAMES:
                         last_user_text = dialogue
-                        
+
                     elif current_speaker in ASSISTANT_NAMES:
                         if last_user_text:
-                            dataset.append({
-                                "messages": [
-                                    {"role": "system", "content": SYSTEM_PROMPT},
-                                    {"role": "user", "content": last_user_text},
-                                    {"role": "assistant", "content": dialogue}
-                                ]
-                            })
-                            last_user_text = None 
+                            dataset.append(
+                                {
+                                    "messages": [
+                                        {"role": "system", "content": SYSTEM_PROMPT},
+                                        {"role": "user", "content": last_user_text},
+                                        {"role": "assistant", "content": dialogue},
+                                    ]
+                                }
+                            )
+                            last_user_text = None
                 else:
                     current_speaker = None
 
-    # 写入最终的 JSONL
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-        for data in dataset:
-            f.write(json.dumps(data, ensure_ascii=False) + '\n')
-            
-    print(f"🎉 提取完成！共读取了 {total_files} 个文件，挖掘出 {len(dataset)} 轮高质量的宁宁对话。")
+    # Write the JSONL dataset
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        for entry in dataset:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    print(
+        f"Extraction complete! Processed {total_files} files, "
+        f"generated {len(dataset)} high-quality Nene dialogues."
+    )
+
 
 if __name__ == "__main__":
-    process_all_scripts()
+    process_scripts()
