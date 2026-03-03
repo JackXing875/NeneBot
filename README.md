@@ -1,7 +1,7 @@
 
 <div align="center">
 
-<img src="assets/nene.gif" width="400" alt="Ayachi Nene">
+<img src="assets/nene.gif" width="600" alt="Ayachi Nene">
 
 # 🌸 NeneBot: Industrial RAG-Powered Assistant
 **基于检索增强生成 (RAG) 架构的绫地宁宁（《魔女的夜宴》）本地大模型对话服务**
