@@ -207,11 +207,29 @@ marimo/_lsp/
 __marimo__/
 
 
-models/
-checkpoints/
-logs/
+# -----------------------------
+# Python 运行缓存与虚拟环境
+# -----------------------------
 __pycache__/
-*.xp3
-
+*.py[cod]
+*$py.class
+.venv/
 venv/
-LLaMA-Factory/
+env/
+.env
+
+data/
+vector_store/
+*.jsonl
+*.json
+*.bin
+*.csv
+
+models/
+.huggingface/
+.cache/
+
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
