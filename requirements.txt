@@ -1,10 +1,17 @@
-sentence-transformers>=2.2.2
-faiss-gpu>=1.7.2  
+# --- API & Web Framework ---
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
 
-torch>=2.1.0
-transformers>=4.38.0
-accelerate>=0.27.0
-flash-attn>=2.3.6  
+# --- Vector Database & AI Core ---
+# FAISS CPU version is used here for broader compatibility in Docker containers.
+# If deploying on a GPU-enabled cluster, this can be swapped to faiss-gpu.
+faiss-cpu>=1.8.0
+sentence-transformers>=2.5.0
+torch>=2.2.0 --index-url https://download.pytorch.org/whl/cpu
 
-tqdm>=4.66.1     
-numpy>=1.24.0
+# --- Utilities ---
+numpy>=1.26.0
+tqdm>=4.66.0
+python-dotenv>=1.0.0
