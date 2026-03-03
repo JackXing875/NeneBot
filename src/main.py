@@ -7,6 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.routers import chat_router
 from src.core.config import settings
 
+from src.core.logger import setup_logger
+
+# Initialize the global industrial logger
+logger = setup_logger()
+
+def create_app() -> FastAPI:
+    logger.info("Initializing NeneBot FastAPI Server...")
+
 def create_app() -> FastAPI:
     """Factory function to create and configure the FastAPI application."""
     app = FastAPI(
