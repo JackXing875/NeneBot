@@ -16,7 +16,7 @@ class RAGPipeline:
         """Initializes the RAG Pipeline with necessary services."""
         self.vector_store = vector_store
         self.embedding_svc = embedding_svc
-        
+
         # INDUSTRIAL STANDARD: Define a distance threshold.
         # Since we use L2 distance in FAISS:
         # - Close to 0: Nearly identical
@@ -44,7 +44,7 @@ class RAGPipeline:
     def build_prompt(self, query: str, context_results: List[Dict]) -> str:
         """Constructs the final prompt injected with filtered context."""
         context_str = "【参考样本】:\n"
-        
+
         # If no results passed the threshold, we provide a fallback instruction
         if not context_results:
             context_str += "(无相关历史记忆，请根据性格设定自由发挥)\n"
@@ -54,13 +54,13 @@ class RAGPipeline:
                 user_q = res.get("query_text", "")
                 bot_a = res.get("bot_response", "")
                 score = res.get("distance_score", 0.0)
-                context_str += f"样本 {idx+1} [相似度:{score:.4f}] - 玩家说: \"{user_q}\" -> 宁宁回: \"{bot_a}\"\n"
+                context_str += (
+                    f"样本 {idx + 1} [相似度:{score:.4f}] - "
+                    f'玩家说: "{user_q}" -> 宁宁回: "{bot_a}"\n'
+                )
 
         final_prompt = (
-            f"{self.system_prompt}\n\n"
-            f"{context_str}\n"
-            f"【当前玩家的输入】: \"{query}\"\n"
-            f"宁宁的回复:"
+            f'{self.system_prompt}\n\n{context_str}\n【当前玩家的输入】: "{query}"\n宁宁的回复:'
         )
         return final_prompt
 
@@ -68,15 +68,14 @@ class RAGPipeline:
         """Processes a query with similarity threshold filtering."""
         # 1. Get raw search results
         raw_contexts = self.retrieve_context(query, top_k)
-        
+
         # 2. FILTERING LOGIC: Only keep results within the threshold
         # This is the key fix for the "donkey's head on a horse" problem
         filtered_contexts = [
-            ctx for ctx in raw_contexts 
-            if ctx.get("distance_score", 1.0) < self.match_threshold
+            ctx for ctx in raw_contexts if ctx.get("distance_score", 1.0) < self.match_threshold
         ]
-        
+
         # 3. Build prompt with filtered results
         final_prompt = self.build_prompt(query, filtered_contexts)
-        
+
         return final_prompt, filtered_contexts

@@ -63,8 +63,8 @@ def main() -> None:
 
     # 3. Process data in batches to prevent Out-Of-Memory (OOM) errors
     batch_size = 64
-    texts_to_embed: List[str] = []
-    metadata_to_store: List[Dict[str, str]] = []
+    # texts_to_embed: List[str] = []
+    # metadata_to_store: List[Dict[str, str]] = []
 
     for i in tqdm(range(0, len(raw_data), batch_size), desc="Processing Batches"):
         batch_items = raw_data[i : i + batch_size]
@@ -92,9 +92,7 @@ def main() -> None:
             # Generate embeddings for the user queries
             embeddings = embedding_svc.encode(batch_texts)
             # Add vectors and metadata to the FAISS store
-            vector_store.add_texts(
-                texts=batch_texts, embeddings=embeddings, metadata=batch_meta
-            )
+            vector_store.add_texts(texts=batch_texts, embeddings=embeddings, metadata=batch_meta)
 
     logger.info(f"Vector database initialization complete. Saved to {settings.vector_index_path}")
 

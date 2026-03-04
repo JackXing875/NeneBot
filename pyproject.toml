@@ -1,0 +1,39 @@
+[project]
+name = "nenebot"
+version = "0.1.0"
+description = "RAG-powered conversational AI engine featuring Ayachi Nene"
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+
+# ==========================================
+# Industrial-grade Linter Configuration (Ruff)
+# ==========================================
+[tool.ruff]
+# Set maximum line length for auto-wrapping
+line-length = 100
+# Target Python version for formatting and linting
+target-version = "py310"
+
+[tool.ruff.lint]
+# Enabled linting rule sets:
+# E, W: Standard PEP8 errors and warnings
+# F: Pyflakes logical errors (e.g., undefined variables)
+# I: isort automatic import sorting
+# B: flake8-bugbear common bug traps
+select = ["E", "F", "I", "W", "B"]
+ignore = []
+
+# ==========================================
+# Strict Static Type Checking (Mypy)
+# ==========================================
+[tool.mypy]
+python_version = "3.10"
+# Extremely strict type checking mode for enterprise standards
+strict = true
+ignore_missing_imports = true
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_configs = true

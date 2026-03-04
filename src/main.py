@@ -6,21 +6,20 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.routers import chat_router
 from src.core.config import settings
-
 from src.core.logger import setup_logger
 
 # Initialize the global industrial logger
 logger = setup_logger()
 
-def create_app() -> FastAPI:
-    logger.info("Initializing NeneBot FastAPI Server...")
 
 def create_app() -> FastAPI:
     """Factory function to create and configure the FastAPI application."""
+    logger.info("Initializing NeneBot FastAPI Server...")
+
     app = FastAPI(
         title=settings.api_title,
         version=settings.api_version,
-        description="RAG-powered conversational API for Ningning."
+        description="RAG-powered conversational API for Ningning.",
     )
 
     # Configure CORS (Cross-Origin Resource Sharing)
@@ -37,6 +36,7 @@ def create_app() -> FastAPI:
 
     return app
 
+
 # Create the global app instance
 app = create_app()
 
@@ -46,5 +46,5 @@ if __name__ == "__main__":
         "src.main:app",
         host=settings.host,
         port=settings.port,
-        reload=True  # Enables hot-reloading during development
+        reload=True,  # Enables hot-reloading during development
     )

@@ -5,7 +5,9 @@ to a local Ollama instance and retrieve the text responses.
 """
 
 import logging
+
 import httpx
+
 from src.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -37,19 +39,17 @@ class OllamaClient:
             "prompt": prompt,
             "stream": False,
             # Set temperature low to make Ningning stick closely to the reference context
-            "options": {"temperature": 0.3, "top_p": 0.85}
+            "options": {"temperature": 0.3, "top_p": 0.85},
         }
 
         logger.info(f"Sending request to Ollama ({self.model_name})...")
-        
+
         try:
             # Using a generous timeout as local LLM inference can take a few seconds
             async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    self.generate_endpoint, json=payload, timeout=60.0
-                )
+                response = await client.post(self.generate_endpoint, json=payload, timeout=60.0)
                 response.raise_for_status()
-                
+
                 result = response.json()
                 return result.get("response", "").strip()
         except httpx.HTTPError as e:

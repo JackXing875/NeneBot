@@ -1,55 +1,76 @@
 #!/bin/bash
-# NeneBot 全自动点火脚本
 
-echo "正在启动 NeneBot 工业级双引擎..."
+set -e
+set -o pipefail
 
-# ==========================================
-# 0. 自动唤醒 Ollama (大模型引擎)
-# ==========================================
-echo "检查 Ollama 引擎状态..."
-# 检查后台是否有 ollama 进程
-if ! pgrep -x "ollama" > /dev/null
-then
-    echo "   发现 Ollama 处于沉睡状态，正在为您自动唤醒..."
-    # 丢弃烦人的日志，在后台静默启动
-    ollama serve > /dev/null 2>&1 &
-    sleep 3  # 给引擎3秒钟的预热时间
-    echo "   Ollama 唤醒成功！"
-else
-    echo "   Ollama 引擎已在正常运转。"
+echo "======================================================="
+echo "        NeneBot - Runtime Service Launcher"
+echo "======================================================="
+
+echo "[0/2] Checking Ollama runtime..."
+
+if ! command -v ollama &> /dev/null; then
+    echo "[ERROR] Ollama is not installed."
+    echo "Install it via: https://ollama.com"
+    exit 1
 fi
 
-# ==========================================
-# 优雅降级与清理机制
-# ==========================================
+if ! pgrep -x "ollama" > /dev/null; then
+    echo "[INFO] Ollama not running. Starting service..."
+    ollama serve > /dev/null 2>&1 &
+    sleep 3
+    echo "[OK] Ollama service started."
+else
+    echo "[OK] Ollama runtime already active."
+fi
+
 cleanup() {
-    echo -e "\n接收到停止信号，正在关闭服务..."
-    kill $BACKEND_PID 2>/dev/null
-    kill $FRONTEND_PID 2>/dev/null
-    echo "界面与后端已安全退出 (Ollama 仍保留在后台为您待命)。"
+    echo ""
+    echo "[INFO] Shutdown signal received. Terminating services..."
+
+    if [[ -n "$BACKEND_PID" ]]; then
+        kill "$BACKEND_PID" 2>/dev/null || true
+    fi
+
+    if [[ -n "$FRONTEND_PID" ]]; then
+        kill "$FRONTEND_PID" 2>/dev/null || true
+    fi
+
+    echo "[OK] Backend and frontend services stopped."
+    echo "[INFO] Ollama remains running in the background."
     exit 0
 }
+
 trap cleanup SIGINT SIGTERM
 
-# ==========================================
-# 1. 启动后端 (FastAPI)
-# ==========================================
-echo "启动后端大脑 (FastAPI -> 端口 8000)..."
+echo "[1/2] Starting backend service (FastAPI on port 8000)..."
+
 python -m src.main &
 BACKEND_PID=$!
+
 sleep 2
 
-# ==========================================
-# 2. 启动前端 (Vue + Vite)
-# ==========================================
-echo "启动视觉界面 (Vue 3 -> 端口 5173)..."
-cd frontend && npm run dev &
+# Optional: health check could be added here
+
+echo "[OK] Backend service launched (PID: $BACKEND_PID)."
+
+echo "[2/2] Starting frontend service (Vue + Vite on port 5173)..."
+
+cd frontend || {
+    echo "[ERROR] Frontend directory not found."
+    cleanup
+}
+
+npm run dev &
 FRONTEND_PID=$!
 
-echo "------------------------------------------------------"
-echo "NeneBot 启动成功！"
-echo "请在浏览器打开 Galgame 界面: http://localhost:5173"
-echo "按 [Ctrl+C] 即可一键安全关闭服务。"
-echo "------------------------------------------------------"
+echo "[OK] Frontend service launched (PID: $FRONTEND_PID)."
+
+echo "-------------------------------------------------------"
+echo "NeneBot is now running."
+echo "Frontend: http://localhost:5173"
+echo "Backend : http://localhost:8000"
+echo "Press Ctrl+C to stop all services."
+echo "-------------------------------------------------------"
 
 wait
