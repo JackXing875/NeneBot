@@ -38,9 +38,14 @@
 </p>
 
 
+> An end-to-end, privacy-first local RAG conversational AI combining FAISS semantic retrieval and Qwen2.5 inference. Features a modern Vue 3 immersive Galgame UI and robust similarity-threshold filtering, demonstrating highly authentic, hallucination-free character reproduction for interactive virtual companionship.
+
+<div>&nbsp;</div>
+
 [**中文文档 (Chinese Version)**](README_ch.md) | [**Vision**](#-vision) | [**Features**](#-features) | [**Quick Start**](#-quick-start) | [**Architecture**](#%EF%B8%8F-architecture) | [**FAQ**](#-faq)
 
 </div>
+
 
 ---
 
