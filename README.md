@@ -8,7 +8,7 @@
 <img src="assets/nene.gif" width="300" alt="Ayachi Nene">
 
 <p align="center">
-  <b>A Local LLM Conversational Agent for Ayachi Nene (Sanoba Witch) powered by Retrieval-Augmented Generation (RAG)</b><br>
+  <b>A Local LLM Conversational Agent for Ayachi Nene (Sanoba Witch) powered by Retrieval-Augmented Generation</b><br>
   <i>"メンカタカラメヤサイダブルニンニクアブラマシマシ！"</i>
 </p>
 
