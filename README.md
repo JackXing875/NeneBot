@@ -1,147 +1,193 @@
 
 <div align="center">
 
-<img src="assets/nene.gif" width="600" alt="Ayachi Nene">
+<img src="assets/nene.gif" width="500" alt="Ayachi Nene">
 
-# 🌸 NeneBot: Industrial RAG-Powered Assistant
-**基于检索增强生成 (RAG) 架构的绫地宁宁（《魔女的夜宴》）本地大模型对话服务**
+# NeneBot: A RAG-Powered Ayachi Nene AI Companion
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-00a393.svg)](https://fastapi.tiangolo.com)
-[![Ollama](https://img.shields.io/badge/Ollama-LLM-white)](https://ollama.com/)
-[![FAISS](https://img.shields.io/badge/FAISS-Vector_DB-black)](https://github.com/facebookresearch/faiss)
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+<p align="center">
+  <b>A Local LLM Conversational Agent for Ayachi Nene (Sanoba Witch) powered by Retrieval-Augmented Generation (RAG)</b><br>
+  <i>"メンカタカラメヤサイダブルニンニクアブラマシマシ！"</i>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Node.js-20%2B-339933.svg?style=flat-square&logo=node.js&logoColor=white" alt="Node.js">
+  <img src="https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Vue.js-3.x-4FC08D.svg?style=flat-square&logo=vuedotjs&logoColor=white" alt="Vue">
+  <img src="https://img.shields.io/badge/Vite-5.x-646CFF.svg?style=flat-square&logo=vite&logoColor=white" alt="Vite">
+  <img src="https://img.shields.io/badge/Tailwind_CSS-4.x-38B2AC.svg?style=flat-square&logo=tailwind-css&logoColor=white" alt="Tailwind">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Ollama-Local_LLM-black.svg?style=flat-square&logo=ollama&logoColor=white" alt="Ollama">
+  <img src="https://img.shields.io/badge/Qwen-2.5-blue.svg?style=flat-square&logo=alibabacloud&logoColor=white" alt="Qwen">
+  <img src="https://img.shields.io/badge/FAISS-Vector_DB-1877F2.svg?style=flat-square&logo=meta&logoColor=white" alt="FAISS">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Linter-Ruff-D7FF3C.svg?style=flat-square&logo=python&logoColor=black" alt="Ruff">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green.svg?style=flat-square" alt="License"></a>
+</p>
+
+[**中文文档 (Chinese Version)**](README_ch.md) | [**Vision**](#-vision) | [**Features**](#-features) | [**Quick Start**](#-quick-start) | [**Architecture**](#%EF%B8%8F-architecture) | [**FAQ**](#-faq)
 
 </div>
 
 ---
 
-## 📖 项目愿景 (Vision)
+## Vision
 
-**NeneBot** 旨在探索如何利用工业级 RAG 架构解决二次元角色对话中的“幻觉”与“语气偏差”问题。与传统的全量微调（Fine-tuning）不同，本项目采用“外挂记忆引擎”方案：
-- **零训练成本**：通过剧本语料库的向量化，实现即时的知识更新。
-- **原汁原味**：强制模型参考原版剧本台词，最大程度还原宁宁的性格特征与说话习惯。
-- **工业级解耦**：前后端完全分离，支持多种向量数据库与 LLM 后端切换。
+Traditional AI role-playing bots often suffer from two fatal flaws: **"Hallucinations"** (making up fake lore) and **"OOC"** (Out of Character responses). While conventional Fine-tuning can help, it is hardware-intensive and rarely eradicates these issues completely.
 
----
-
-## 🛠️ 技术栈 (Tech Stack)
-
-
-
-* **Core Engine**: [FastAPI](https://fastapi.tiangolo.com/) (Asynchronous high-performance framework)
-* **Vector Database**: [FAISS](https://faiss.ai/) (Efficient similarity search by Meta)
-* **Embedding Model**: `BAAI/bge-small-zh-v1.5` (State-of-the-art Chinese embedding)
-* **LLM Backend**: [Ollama](https://ollama.com/) (Running Qwen2.5 locally)
-* **UI Framework**: [Streamlit](https://streamlit.io/) (Interactive AI frontend)
-* **DevOps**: Docker, Makefile, Ruff (Linter), Mypy (Type checking)
+**NeneBot** is an attempt to bring **RAG (Retrieval-Augmented Generation)** architecture to *Galgame* character simulation. We completely bypassed expensive cloud APIs to build a 100% local, privacy-first engine:
+* **External Memory Engine**: By slicing and vectorizing the original script of *Sanoba Witch*, we give the AI "true" memories.
+* **Authentic Reproduction**: The LLM is forced to reference retrieved original dialogue, perfectly capturing Nene's gentle, shy, and responsible personality.
+* **Ultimate Front-end Aesthetics**: Ditching clunky terminal interfaces for an immersive, modern visual novel (Galgame) UI.
 
 ---
 
-## 📂 项目目录结构 (Directory Structure)
+## Features
+
+* **Lightning-Fast Local Inference**: Powered by Ollama and Qwen 2.5, enjoy seamless conversations completely offline. Absolute privacy guaranteed.
+* **Millisecond Semantic Retrieval**: Utilizes Meta's FAISS vector database alongside the `bge-small-zh` embedding model to pinpoint relevant historical scripts.
+* **Threshold Fallback Mechanism**: Features a custom `match_threshold` filter. If the topic is unfamiliar, Nene seamlessly transitions to zero-shot character playing rather than forcing irrelevant memories.
+* **Immersive Visual Experience**: A stunning Vue 3 + Vite front-end featuring a dark glassmorphism UI, typewriter effects, and dynamic breathing layouts.
+* **Out-of-the-Box Automation**: Includes 1-click installation and startup scripts for both Windows and Linux. No terminal anxiety required.
+
+---
+
+## Quick Start
+
+We have prepared a "babysitter-level" quick start guide for users without a technical background. Please choose the steps based on your OS:
+
+### For Windows Users
+
+**Step 1: Install Prerequisites (Skip if already installed)**
+1. Download and install [Python 3.10+](https://www.python.org/downloads/). **[CRITICAL]**: Ensure you check <kbd>Add Python to PATH</kbd> at the bottom of the installer!
+2. Download and install [Node.js (LTS version)](https://nodejs.org/).
+3. Download and install [Ollama for Windows](https://ollama.com/download/windows).
+
+**Step 2: Download NeneBot**
+Click the green `Code` button on this GitHub page and select `Download ZIP`. Extract it to a folder on your PC (e.g., `D:\NeneBot`).
+
+**Step 3: One-Click Ignition!**
+Open the extracted folder and **double-click `start_windows.bat`**.
+* Grab a coffee. The script will automatically download dependencies, wake up the AI engine, and launch your browser.
+* Once the beautiful Galgame UI pops up, Nene is ready to chat!
+
+---
+
+### For Linux Users 
+
+Open your terminal and execute the following elegant commands:
+
+```bash
+# 1. Clone the repository
+git clone [https://github.com/your-username/NeneBot.git](https://github.com/your-username/NeneBot.git)
+cd NeneBot
+
+# 2. Grant execution permissions to scripts
+chmod +x scripts/setup.sh scripts/run.sh
+
+# 3. Run the automated setup (Only required once)
+./scripts/setup.sh
+
+# 4. Ignite the engines!
+./scripts/run.sh
+```
+
+> 💡 **Tip:** Once started, visit `http://localhost:5173` in your browser for the UI. The backend API Swagger docs are located at `http://localhost:8000/docs`.
+
+---
+
+## Architecture
+
+This project strictly adheres to microservice and front/back-end decoupling standards:
 
 ```text
 NeneBot/
-├── data/raw/                  # 原始剧本语料 (train.jsonl)
-├── vector_store/              # 持久化向量索引与元数据
-├── src/                       # 核心业务逻辑
-│   ├── api/                   # FastAPI 路由与 Pydantic 模型
-│   ├── core/                  # 配置中心 (Settings) 与全局异常/日志
-│   ├── infrastructure/        # 外部服务适配器 (FAISS, Ollama Client)
-│   └── services/              # 核心服务 (RAG Pipeline, Embedding)
-├── ui/                        # 前端交互界面 (Streamlit)
-├── scripts/                   # 自动化运维脚本 (数据库初始化、Linters)
-├── deploy/                    # 部署相关配置 (Dockerfile)
-├── requirements.txt           # 依赖清单
-├── Makefile                   # 工业标准自动化指令
-└── README.md
-```
-
----
-
-## 🚀 快速开始 (Quick Start)
-
-### 1. 环境准备
-
-确保你的机器安装了 **Python 3.10+** 和 **Ollama**。
-
-```bash
-# 1. 安装系统级依赖 (Linux/WSL)
-sudo apt-get update && sudo apt-get install zstd -y
-
-# 2. 安装 Ollama 并运行模型
-curl -fsSL [https://ollama.com/install.sh](https://ollama.com/install.sh) | sh
-ollama serve &
-ollama run qwen2.5
-```
-
-### 2. 安装项目依赖
-
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 3. 数据灌库与点火
-执行：
-
-```bash
-# 生成向量索引
-python scripts/init_vector_db.py
-
-# 启动后端服务
-python src/main.py
-```
-
-### 4. 启动可视化界面
-
-在新的终端中运行：
-
-```bash
-streamlit run ui/app.py
+├── 📂 data/             # Raw script corpus (for vectorization)
+├── 📂 vector_store/     # FAISS persistent vector index
+├── 📂 frontend/         # Vue 3 + Vite immersive UI
+├── 📂 src/              # FastAPI core backend service
+│   ├── api/             # Routing and Pydantic data validation
+│   ├── core/            # pydantic-settings config and global exceptions
+│   ├── infrastructure/  # External adapters (FAISS client, Ollama bridge)
+│   └── services/        # Core business logic (RAG pipeline, Embeddings)
+├── 📂 scripts/          # DevOps toolbox (Setup, Run, Linters)
+├── 📄 pyproject.toml    # Industrial linter configs (Ruff & Mypy)
+└── 📄 requirements.txt  # Python dependency list
 
 ```
 
 ---
 
-## 🧠 核心 RAG 算法流程 (RAG Flow)
+## Advanced Configuration
 
-1. **Semantic Search**: 使用 `bge-small-zh` 将玩家输入转化为 512 维向量。
-2. **Threshold Filtering**: 在 FAISS 中检索 Top-K 结果，并应用 `match_threshold`（默认 0.8）过滤无关记忆。
-3. **Prompt Synthesis**: 动态注入检索到的宁宁原话作为 Few-shot 样本。
-4. **Inference**: 结合系统提示词，由本地 Qwen2.5 生成最终回复。
+For developers who want to tweak the bot, you can easily customize Nene:
 
----
-
-## ⚙️ 工业级规范 (Standard & Quality)
-
-* **Type Safety**: 全量使用 Python Type Hints，通过 `mypy` 静态检查。
-* **Linting**: 严格遵守 Google Python Style Guide，使用 `ruff` 进行格式化。
-* **Configuration**: 基于 `pydantic-settings` 的环境变量管理。
-* **Logging**: 结构化日志输出，支持生产环境追踪。
+* **Adjust Strictness**: Modify `self.match_threshold` (default 0.8) in `src/services/rag_pipeline.py`. Lower values make her stick strictly to the script; higher values allow more creative freedom.
+* **Change Sprites & Backgrounds**: Replace `nene_sprite.png` and `bg_room.jpg` in the `frontend/public/` directory. Changes apply instantly thanks to Vite HMR.
+* **Modify System Prompt**: Update `self.system_prompt` in `rag_pipeline.py` to add new personality traits or instructions.
 
 ---
 
-## 🤝 贡献指南 (Contributing)
+## FAQ
 
-欢迎提交 Pull Request 或 Issue！
+<details>
+<summary><b>1. "Python / Node is not recognized as an internal or external command" on Windows?</b></summary>
 
-1. Fork 本项目。
-2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)。
-3. 提交你的更改 (`git commit -m 'Add some AmazingFeature'`)。
-4. 推送到分支 (`git push origin feature/AmazingFeature`)。
-5. 开启一个 Pull Request。
+
+
+
+
+You either haven't installed Python/Node.js, or forgot to add them to your environment variables. Reinstall them and ensure you check the "Add to PATH" option.
+</details>
+
+<details>
+<summary><b>2. The chat is stuck on "Thinking...", followed by a connection error?</b></summary>
+
+
+
+
+
+This usually means the Ollama service isn't running, or your machine ran out of VRAM/RAM to load the Qwen 2.5 model. Check your task manager, or try running <code>ollama run qwen2.5</code> manually in the terminal to diagnose the engine.
+</details>
+
+<details>
+<summary><b>3. Can I swap the character to someone else (e.g., Ayase Mitsukasa)?</b></summary>
+
+
+
+
+
+Absolutely! This is a universal architecture. Simply:
+
+1. Replace <code>data/raw/train.jsonl</code> with Ayase's dialogue data.
+2. Run <code>python scripts/init_vector_db.py</code> to rebuild the memory database.
+3. Replace the sprite assets in <code>frontend/public/</code>.
+4. Update the character name and persona in the system prompt.
+</details>
 
 ---
 
-## 📄 开源协议 (License)
+## Contributing
 
-本项目采用 [**GNU General Public License v3.0**](https://www.google.com/search?q=LICENSE) 许可。
+We welcome contributions from the community! Whether it's fixing bugs, improving the CSS aesthetics, or providing better script datasets, please follow these steps:
+
+1. `Fork` the Project.
+2. Create your Feature Branch: `git checkout -b feature/AmazingFeature`
+3. Commit your Changes: `git commit -m 'feat: Add some AmazingFeature'`
+4. Push to the Branch: `git push origin feature/AmazingFeature`
+5. Open a Pull Request.
+
+*(Note: Before submitting PRs, please run `./scripts/run_linter.sh` to ensure your code passes our strict Ruff and Mypy checks.)*
 
 ---
 
-<div align="center">
-<i>"保科君，接下来的工作也要一起努力哦..."</i>
-</div>
+## License
+
+Distributed under the **[GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0)**.
+This project is for technical exploration and learning purposes only. The copyright of the character sprites, background art, and game scripts belongs to the original creator (Yuzusoft). Please do not use them for commercial purposes.
 
