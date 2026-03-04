@@ -97,7 +97,7 @@ chmod +x scripts/setup.sh scripts/run.sh
 ./scripts/run.sh
 ```
 
-> 💡 **Tip:** Once started, visit `http://localhost:5173` in your browser for the UI. The backend API Swagger docs are located at `http://localhost:8000/docs`.
+> **Tip:** Once started, visit `http://localhost:5173` in your browser for the UI. The backend API Swagger docs are located at `http://localhost:8000/docs`.
 
 ---
 
