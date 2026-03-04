@@ -14,6 +14,8 @@
   <i>"メンカタカラメヤサイダブルニンニクアブラマシマシ！"</i>
 </p>
 
+ <div>&nbsp;</div>
+ 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Node.js-20%2B-339933.svg?style=flat-square&logo=node.js&logoColor=white" alt="Node.js">
