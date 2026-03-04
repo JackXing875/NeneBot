@@ -219,6 +219,8 @@ env/
 .env
 
 data/
+*.txt
+
 vector_store/
 *.jsonl
 *.json
