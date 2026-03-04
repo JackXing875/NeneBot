@@ -2,10 +2,13 @@
 <div align="center">
 
 
-
 # NeneBot: A RAG-Powered Ayachi Nene AI Companion
 
+ <div>&nbsp;</div>
+
 <img src="assets/nene.gif" width="300" alt="Ayachi Nene">
+
+ <div>&nbsp;</div>
 
 <p align="center">
   <b>A Local LLM Conversational Agent for Ayachi Nene (Sanoba Witch) powered by Retrieval-Augmented Generation</b><br>
@@ -31,6 +34,7 @@
   <img src="https://img.shields.io/badge/Linter-Ruff-D7FF3C.svg?style=flat-square&logo=python&logoColor=black" alt="Ruff">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green.svg?style=flat-square" alt="License"></a>
 </p>
+
 
 [**中文文档 (Chinese Version)**](README_ch.md) | [**Vision**](#-vision) | [**Features**](#-features) | [**Quick Start**](#-quick-start) | [**Architecture**](#%EF%B8%8F-architecture) | [**FAQ**](#-faq)
 

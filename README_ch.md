@@ -3,7 +3,11 @@
 
 # NeneBot: A RAG-Powered Ayachi Nene AI Companion
 
+ <div>&nbsp;</div>
+
 <img src="assets/nene.gif" width="300" alt="Ayachi Nene">
+
+ <div>&nbsp;</div>
 
 <p align="center">
   <b>基于检索增强生成 (RAG) 架构的绫地宁宁本地大模型对话服务</b><br>
