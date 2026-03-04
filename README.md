@@ -11,7 +11,7 @@
  <div>&nbsp;</div>
 
 <p align="center">
-  <b>A Local LLM Conversational Agent for Ayachi Nene (Sanoba Witch) powered by Retrieval-Augmented Generation</b><br>
+  <b>A Local LLM Conversational Agent for Ayachi Nene powered by Retrieval-Augmented Generation</b><br>
   <i>"メンカタカラメヤサイダブルニンニクアブラマシマシ！"</i>
 </p>
 
