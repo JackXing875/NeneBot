@@ -1,9 +1,11 @@
 
 <div align="center">
 
-<img src="assets/nene.gif" width="500" alt="Ayachi Nene">
+
 
 # NeneBot: A RAG-Powered Ayachi Nene AI Companion
+
+<img src="assets/nene.gif" width="300" alt="Ayachi Nene">
 
 <p align="center">
   <b>A Local LLM Conversational Agent for Ayachi Nene (Sanoba Witch) powered by Retrieval-Augmented Generation (RAG)</b><br>
