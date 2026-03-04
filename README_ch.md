@@ -37,7 +37,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green.svg?style=flat-square" alt="License"></a>
 </p>
 
-[**项目愿景**](#-项目愿景-vision) | [**特性一览**](#-核心特性-features) | [**小白极速启动**](#-小白极速启动-getting-started) | [**架构详解**](#-技术架构-architecture) | [**常见问题**](#-常见问题-faq)
+[**项目愿景**](#-项目愿景-vision) | [**特性一览**](#-核心特性-features) | [**快速启动**](#-小白极速启动-getting-started) | [**项目架构**](#-技术架构-architecture) | [**常见问题**](#-常见问题-faq)
 
 </div>
 
@@ -51,7 +51,7 @@
 
 **NeneBot** 是一次将**RAG（检索增强生成）技术**应用于 *Galgame* 角色模拟的尝试。我们摒弃了昂贵的云端 *API*，完全在本地构建：
 * **外挂记忆引擎**：将《魔女的夜宴》原版剧本切片并向量化，让 AI 拥有“真物”般的记忆。
-* **原汁原味还原**：模型被强制要求参考检索到的原版台词进行输出，100% 还原宁宁温柔、害羞、爱操心的性格特点。
+* **原汁原味还原**：模型被强制要求参考检索到的原版台词进行输出，100% 还原宁宁温柔、害羞的性格特点。
 * **极致还原游戏**：告别简陋的控制台，打造沉浸式的现代 Galgame 视觉交互界面。
 
 ---
@@ -68,7 +68,7 @@
 
 ## 快速开始
 
-我们为非技术背景的玩家准备了“保姆级”的一键启动方案。请根据你的操作系统选择相应的步骤：
+请根据你的操作系统选择相应的步骤：
 
 ### Windows 用户
 
@@ -83,7 +83,7 @@
 **第三步：双击运行！**
 进入解压后的文件夹，找到并**双击运行 `start_windows.bat`**。
 * 喝口水，脚本会自动为你下载依赖、唤醒 AI 引擎并打开浏览器。
-* 当你看到精美的 Galgame 界面弹出时，宁宁就已经在等你了！
+* 当你看对话界面弹出时，宁宁就已经在等你了！
 
 ---
 
@@ -118,8 +118,8 @@ chmod +x scripts/setup.sh scripts/run.sh
 NeneBot/
 ├── 📂 data/             # 原始剧本语料库 (用于向量化)
 ├── 📂 vector_store/     # FAISS 持久化向量索引
-├── 📂 frontend/         # 🎨 Vue 3 + Vite + Tailwind 沉浸式前端界面
-├── 📂 src/              # ⚙️ FastAPI 核心后端服务
+├── 📂 frontend/         # Vue 3 + Vite + Tailwind 沉浸式前端界面
+├── 📂 src/              # FastAPI 核心后端服务
 │   ├── api/             # 路由控制与 Pydantic 数据校验
 │   ├── core/            # pydantic-settings 配置中心与全局异常处理
 │   ├── infrastructure/  # 基础设施适配层 (FAISS客户端, Ollama桥接)

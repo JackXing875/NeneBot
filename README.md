@@ -50,7 +50,7 @@ Traditional AI role-playing bots often suffer from two fatal flaws: **"Hallucina
 
 **NeneBot** is an attempt to bring **RAG (Retrieval-Augmented Generation)** architecture to *Galgame* character simulation. We completely bypassed expensive cloud APIs to build a 100% local, privacy-first engine:
 * **External Memory Engine**: By slicing and vectorizing the original script of *Sanoba Witch*, we give the AI "true" memories.
-* **Authentic Reproduction**: The LLM is forced to reference retrieved original dialogue, perfectly capturing Nene's gentle, shy, and responsible personality.
+* **Authentic Reproduction**: The LLM is forced to reference retrieved original dialogue, perfectly capturing Nene's gentle and shy personality.
 * **Ultimate Front-end Aesthetics**: Ditching clunky terminal interfaces for an immersive, modern visual novel (Galgame) UI.
 
 ---
@@ -82,7 +82,7 @@ Click the green `Code` button on this GitHub page and select `Download ZIP`. Ext
 **Step 3: One-Click Ignition!**
 Open the extracted folder and **double-click `start_windows.bat`**.
 * Grab a coffee. The script will automatically download dependencies, wake up the AI engine, and launch your browser.
-* Once the beautiful Galgame UI pops up, Nene is ready to chat!
+* Once the UI pops up, Nene is ready to chat!
 
 ---
 
