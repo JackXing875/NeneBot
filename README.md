@@ -37,6 +37,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green.svg?style=flat-square" alt="License"></a>
 </p>
 
+<div>&nbsp;</div>
 
 > An end-to-end, privacy-first local RAG conversational AI combining FAISS semantic retrieval and Qwen2.5 inference. Features a modern Vue 3 immersive Galgame UI and robust similarity-threshold filtering, demonstrating highly authentic, hallucination-free character reproduction for interactive virtual companionship.
 

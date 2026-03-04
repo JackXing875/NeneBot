@@ -37,6 +37,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green.svg?style=flat-square" alt="License"></a>
 </p>
 
+<div>&nbsp;</div>
+
 > 端到端纯本地 RAG 对话型 AI，结合 FAISS 语义检索与 Qwen2.5 本地推理引擎。支持沉浸式 Vue 3 视觉交互界面与稳健的相似度阈值熔断机制，展现了在消除“幻觉”与“OOC”方面的高保真 Galgame 角色重现能力，适用于互动式虚拟陪伴场景。
 
 <div>&nbsp;</div>
