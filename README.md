@@ -33,7 +33,6 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Linter-Ruff-D7FF3C.svg?style=flat-square&logo=python&logoColor=black" alt="Ruff">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green.svg?style=flat-square" alt="License"></a>
 </p>
 
