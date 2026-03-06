@@ -42,7 +42,7 @@
 
 <div>&nbsp;</div>
 
-[**中文文档 (Chinese Version)**](README_ch.md) | [**Vision**](#-vision) | [**Features**](#-features) | [**Quick Start**](#-quick-start) | [**Architecture**](#%EF%B8%8F-architecture) | [**FAQ**](#-faq)
+[**中文文档 (Chinese Version)**](README_ch.md) | [**Vision**](#vision) | [**Features**](#features) | [**Quick Start**](#quick-start) | [**Architecture**](#architecture) | [**FAQ**](#faq)
 
 </div>
 
