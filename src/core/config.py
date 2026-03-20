@@ -29,11 +29,15 @@ class Settings(BaseSettings):
     llm_model_name: str = "qwen2.5"
 
     # Storage Paths
-    data_path: str = str(
-        PROJECT_ROOT / "data" / "raw" / "train.jsonl"
-    )  # Make sure the extension matches your actual file
+    data_path: str = str(PROJECT_ROOT / "data" / "raw" / "train.jsonl")
     vector_index_path: str = str(PROJECT_ROOT / "vector_store" / "faiss_index.bin")
     knowledge_meta_path: str = str(PROJECT_ROOT / "vector_store" / "knowledge_base.json")
+
+    # RAG Settings
+    match_threshold: float = 0.55  # Cosine similarity cutoff (0~1, higher = stricter)
+
+    # Session / Memory Settings
+    session_max_history: int = 20  # Max messages (user+assistant) kept per session
 
     class Config:
         """Pydantic config class for environment variable loading."""

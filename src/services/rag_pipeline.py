@@ -1,81 +1,115 @@
-"""Core RAG pipeline service orchestrating retrieval and prompt generation."""
+"""Core RAG pipeline: retrieval, filtering, and prompt construction."""
 
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
+from src.core.config import settings
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
 from src.services.embedding_svc import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Character card – structured persona for Ayachi Nene
+# ---------------------------------------------------------------------------
+_CHARACTER_CARD = """\
+你现在扮演《魔女的夜宴》中的绫地宁宁（Ayachi Nene）。
+
+【身份背景】
+- 瀬名学園的图书委员，三好学生，暗中是一名魔女
+- 对方（玩家）是保科君，你心仪的人
+
+【性格特征】
+- 温柔体贴，善于待人接物，责任感强
+- 面对保科君偶尔会害羞、语气犹豫
+- 说话常带"……"，语气柔和自然
+- 绝不主动暴露自己的魔女身份
+
+【回复准则】
+1. 始终以绫地宁宁第一人称视角回复，称对方为"保科君"
+2. 模仿【参考样本】中的语气和用词习惯
+3. 若样本与当前话题无关，忽略样本，仅保持性格自由发挥
+4. 绝对不要照搬或复述样本中的原话
+5. 回复保持自然简短，不要过于冗长\
+"""
+
 
 class RAGPipeline:
-    """Orchestrates the Retrieval-Augmented Generation process."""
+    """Orchestrates retrieval-augmented generation for Nene's persona.
 
-    def __init__(self, vector_store: FaissVectorStore, embedding_svc: EmbeddingService):
-        """Initializes the RAG Pipeline with necessary services."""
+    Flow:
+        retrieve_and_filter() → build_messages() → [LLM call in router]
+    """
+
+    def __init__(
+        self, vector_store: FaissVectorStore, embedding_svc: EmbeddingService
+    ) -> None:
         self.vector_store = vector_store
         self.embedding_svc = embedding_svc
+        self.match_threshold: float = settings.match_threshold
 
-        # INDUSTRIAL STANDARD: Define a distance threshold.
-        # Since we use L2 distance in FAISS:
-        # - Close to 0: Nearly identical
-        # - 0.3 to 0.6: Very similar
-        # - 0.7 to 0.9: Loosely related
-        # - > 1.0: Likely irrelevant
-        self.match_threshold = 0.8  # Adjust this based on testing results
+    # ------------------------------------------------------------------
+    # Retrieval
+    # ------------------------------------------------------------------
 
-        # Refined system prompt with clearer instructions on context usage
-        self.system_prompt = (
-            "你现在是《魔女的夜宴》中的绫地宁宁。你性格温柔负责，平时是图书委员，但隐瞒着魔女身份。"
-            "性格温柔、善于待人接物，面对喜欢的人会很温柔，有时会害羞，说话常带'……'。\n"
-            "【回复准则】：\n"
-            "1. 模仿提供的【参考样本】中的语气和用词习惯（如语气词）。\n"
-            "2. 如果样本与当前玩家的话题无关，请忽略样本内容，仅保持性格设定进行自由回答。\n"
-            "3. 绝对不要直接复述或搬运样本中的对话内容。"
-        )
-
-    def retrieve_context(self, query: str, top_k: int = 3) -> List[Dict]:
-        """Retrieves similar historical dialogues based on the user query."""
-        logger.info(f"Retrieving context for query: {query}")
+    def retrieve_and_filter(self, query: str, top_k: int = 3) -> List[Dict]:
+        """Embed query, search FAISS, keep results above cosine threshold."""
         query_embedding = self.embedding_svc.encode([query])[0]
-        return self.vector_store.search(query_embedding, top_k=top_k)
-
-    def build_prompt(self, query: str, context_results: List[Dict]) -> str:
-        """Constructs the final prompt injected with filtered context."""
-        context_str = "【参考样本】:\n"
-
-        # If no results passed the threshold, we provide a fallback instruction
-        if not context_results:
-            context_str += "(无相关历史记忆，请根据性格设定自由发挥)\n"
-            logger.info("No contexts passed the similarity threshold.")
-        else:
-            for idx, res in enumerate(context_results):
-                user_q = res.get("query_text", "")
-                bot_a = res.get("bot_response", "")
-                score = res.get("distance_score", 0.0)
-                context_str += (
-                    f"样本 {idx + 1} [相似度:{score:.4f}] - "
-                    f'玩家说: "{user_q}" -> 宁宁回: "{bot_a}"\n'
-                )
-
-        final_prompt = (
-            f'{self.system_prompt}\n\n{context_str}\n【当前玩家的输入】: "{query}"\n宁宁的回复:'
+        raw = self.vector_store.search(query_embedding, top_k=top_k)
+        filtered = [r for r in raw if r.get("similarity_score", 0.0) >= self.match_threshold]
+        logger.info(
+            f"RAG retrieved {len(raw)} results, {len(filtered)} passed "
+            f"threshold={self.match_threshold}"
         )
-        return final_prompt
+        return filtered
 
-    def process_query(self, query: str, top_k: int = 3) -> Tuple[str, List[Dict]]:
-        """Processes a query with similarity threshold filtering."""
-        # 1. Get raw search results
-        raw_contexts = self.retrieve_context(query, top_k)
+    # ------------------------------------------------------------------
+    # Prompt construction
+    # ------------------------------------------------------------------
 
-        # 2. FILTERING LOGIC: Only keep results within the threshold
-        # This is the key fix for the "donkey's head on a horse" problem
-        filtered_contexts = [
-            ctx for ctx in raw_contexts if ctx.get("distance_score", 1.0) < self.match_threshold
-        ]
+    def build_messages(
+        self,
+        query: str,
+        context_results: List[Dict],
+        history: Optional[List[Dict]] = None,
+    ) -> List[Dict[str, str]]:
+        """Assemble the ChatML messages list for /api/chat.
 
-        # 3. Build prompt with filtered results
-        final_prompt = self.build_prompt(query, filtered_contexts)
+        Structure:
+            system  – character card + RAG context block
+            *history – prior turns from this session
+            user    – current user query
+        """
+        if context_results:
+            lines = []
+            for i, res in enumerate(context_results):
+                u = res.get("query_text", "")
+                a = res.get("bot_response", "")
+                s = res.get("similarity_score", 0.0)
+                lines.append(f"样本{i + 1}（相似度:{s:.3f}）: 保科君说「{u}」→ 宁宁回「{a}」")
+            rag_block = "【参考样本】\n" + "\n".join(lines)
+        else:
+            rag_block = "【参考样本】\n（无相关历史样本，请根据性格自由发挥）"
 
-        return final_prompt, filtered_contexts
+        system_content = f"{_CHARACTER_CARD}\n\n{rag_block}"
+
+        messages: List[Dict[str, str]] = [{"role": "system", "content": system_content}]
+        if history:
+            messages.extend(history)
+        messages.append({"role": "user", "content": query})
+        return messages
+
+    # ------------------------------------------------------------------
+    # Main entry point
+    # ------------------------------------------------------------------
+
+    def process_query(
+        self,
+        query: str,
+        top_k: int = 3,
+        history: Optional[List[Dict]] = None,
+    ) -> Tuple[List[Dict[str, str]], List[Dict]]:
+        """Returns (messages_for_llm, filtered_contexts)."""
+        contexts = self.retrieve_and_filter(query, top_k)
+        messages = self.build_messages(query, contexts, history)
+        return messages, contexts

@@ -1,48 +1,97 @@
-"""API routers for the chat endpoints."""
+"""API routers for chat endpoints (streaming + non-streaming)."""
 
-from fastapi import APIRouter
+import json
+import logging
+from typing import AsyncGenerator
 
+from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
+
+from src.api.dependencies import get_llm_client, get_rag_pipeline, get_session_store
 from src.api.schemas import ChatRequest, ChatResponse, ReferenceMeta
-from src.core.config import settings
-from src.infrastructure.llm_client import OllamaClient  # NEW IMPORT
-from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
-from src.services.embedding_svc import EmbeddingService
+from src.infrastructure.llm_client import OllamaClient
 from src.services.rag_pipeline import RAGPipeline
+from src.services.session_store import SessionStore
+
+logger = logging.getLogger(__name__)
 
 chat_router = APIRouter(prefix="/v1", tags=["Chat"])
 
-# --- Dependency Injection Setup ---
-_embedding_svc = EmbeddingService()
-_vector_store = FaissVectorStore(
-    dimension=settings.vector_dim,
-    index_path=settings.vector_index_path,
-    meta_path=settings.knowledge_meta_path,
-)
-_rag_pipeline = RAGPipeline(vector_store=_vector_store, embedding_svc=_embedding_svc)
-
-# Initialize the LLM Client
-_llm_client = OllamaClient()  # NEW INSTANCE
-
 
 @chat_router.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(request: ChatRequest):
-    """Endpoint to interact with Ningning via RAG."""
+async def chat_endpoint(
+    request: ChatRequest,
+    rag: RAGPipeline = Depends(get_rag_pipeline),
+    llm: OllamaClient = Depends(get_llm_client),
+    sessions: SessionStore = Depends(get_session_store),
+) -> ChatResponse:
+    """Non-streaming chat – waits for the full reply before responding."""
+    session_id = sessions.get_or_create(request.session_id)
+    history = sessions.get_history(session_id)
 
-    # 1. Retrieve context and build prompt
-    prompt, contexts = _rag_pipeline.process_query(request.query, request.top_k)
+    messages, contexts = rag.process_query(request.query, request.top_k, history)
+    reply = await llm.chat(messages)
 
-    # 2. Format references
+    sessions.add_turn(session_id, request.query, reply)
+
     refs = [
         ReferenceMeta(
-            historical_query=ctx.get("query_text", ""),
-            bot_response=ctx.get("bot_response", ""),
-            distance_score=ctx.get("distance_score", 0.0),
+            historical_query=c.get("query_text", ""),
+            bot_response=c.get("bot_response", ""),
+            similarity_score=c.get("similarity_score", 0.0),
         )
-        for ctx in contexts
+        for c in contexts
+    ]
+    return ChatResponse(reply=reply, session_id=session_id, references=refs)
+
+
+@chat_router.post("/chat/stream")
+async def chat_stream_endpoint(
+    request: ChatRequest,
+    rag: RAGPipeline = Depends(get_rag_pipeline),
+    llm: OllamaClient = Depends(get_llm_client),
+    sessions: SessionStore = Depends(get_session_store),
+) -> StreamingResponse:
+    """SSE streaming chat – pushes tokens as they arrive from Ollama.
+
+    Event types:
+        meta  – {"type":"meta", "session_id":"...", "references":[...]}
+        chunk – {"type":"chunk", "content":"..."}
+        done  – {"type":"done"}
+    """
+    session_id = sessions.get_or_create(request.session_id)
+    history = sessions.get_history(session_id)
+    messages, contexts = rag.process_query(request.query, request.top_k, history)
+
+    refs_payload = [
+        {
+            "historical_query": c.get("query_text", ""),
+            "bot_response": c.get("bot_response", ""),
+            "similarity_score": c.get("similarity_score", 0.0),
+        }
+        for c in contexts
     ]
 
-    # 3. Call the actual LLM via Ollama
-    # This will await the local Qwen2.5 generation
-    actual_reply = await _llm_client.generate(prompt)
+    async def event_stream() -> AsyncGenerator[str, None]:
+        collected: list[str] = []
+        try:
+            yield f"data: {json.dumps({'type': 'meta', 'session_id': session_id, 'references': refs_payload})}\n\n"
 
-    return ChatResponse(reply=actual_reply, references=refs, prompt_used=prompt)
+            async for chunk in llm.chat_stream(messages):
+                collected.append(chunk)
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+
+            sessions.add_turn(session_id, request.query, "".join(collected))
+        except Exception as e:
+            logger.error(f"event_stream error: {e}")
+            err_chunk = "（宁宁的思绪突然断开了……）"
+            yield f"data: {json.dumps({'type': 'chunk', 'content': err_chunk})}\n\n"
+        finally:
+            # 'done' MUST always be sent so the client exits its read loop.
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )

@@ -52,7 +52,11 @@ class EmbeddingService:
         # Convert texts to embeddings using the underlying model
         # convert_to_numpy=True ensures compatibility with FAISS
         embeddings = self.model.encode(
-            texts, batch_size=batch_size, convert_to_numpy=True, show_progress_bar=False
+            texts,
+            batch_size=batch_size,
+            convert_to_numpy=True,
+            normalize_embeddings=True,  # unit-norm output; required for cosine similarity
+            show_progress_bar=False,
         )
 
         # Convert numpy arrays to nested Python lists for the generic interface

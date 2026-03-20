@@ -1,10 +1,8 @@
-"""Client for interacting with the local Ollama LLM API.
+"""Async Ollama client using /api/chat with streaming support."""
 
-This module provides an asynchronous interface to send generated prompts
-to a local Ollama instance and retrieve the text responses.
-"""
-
+import json
 import logging
+from typing import AsyncGenerator, Dict, List
 
 import httpx
 
@@ -14,44 +12,55 @@ logger = logging.getLogger(__name__)
 
 
 class OllamaClient:
-    """Client to interact with the Ollama REST API."""
+    """Async client for Ollama's /api/chat endpoint.
+
+    Supports:
+    - Token-level streaming via chat_stream() (for SSE endpoints)
+    - Full-response await via chat() (fallback / testing)
+    """
 
     def __init__(self) -> None:
-        """Initializes the Ollama client with settings."""
-        self.base_url = settings.ollama_base_url
+        self.chat_endpoint = f"{settings.ollama_base_url}/api/chat"
         self.model_name = settings.llm_model_name
-        self.generate_endpoint = f"{self.base_url}/api/generate"
+        self._options = {"temperature": 0.3, "top_p": 0.85}
 
-    async def generate(self, prompt: str) -> str:
-        """Sends a prompt to the Ollama API and returns the generated text.
-
-        Args:
-            prompt: The fully constructed prompt string (including context).
-
-        Returns:
-            The generated response string from the LLM.
-
-        Raises:
-            httpx.HTTPError: If the connection to Ollama fails.
-        """
+    async def chat_stream(
+        self, messages: List[Dict[str, str]]
+    ) -> AsyncGenerator[str, None]:
+        """Yields response content chunks from Ollama's streaming API."""
         payload = {
             "model": self.model_name,
-            "prompt": prompt,
-            "stream": False,
-            # Set temperature low to make Ningning stick closely to the reference context
-            "options": {"temperature": 0.3, "top_p": 0.85},
+            "messages": messages,
+            "stream": True,
+            "options": self._options,
         }
-
-        logger.info(f"Sending request to Ollama ({self.model_name})...")
-
         try:
-            # Using a generous timeout as local LLM inference can take a few seconds
-            async with httpx.AsyncClient() as client:
-                response = await client.post(self.generate_endpoint, json=payload, timeout=60.0)
-                response.raise_for_status()
+            # trust_env=False prevents httpx from picking up http_proxy / HTTP_PROXY
+            # env vars, which would route localhost Ollama requests through a proxy
+            # and cause 502 Bad Gateway errors.
+            async with httpx.AsyncClient(trust_env=False) as client:
+                async with client.stream(
+                    "POST", self.chat_endpoint, json=payload, timeout=120.0
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        try:
+                            data = json.loads(line)
+                            if not data.get("done"):
+                                content = data.get("message", {}).get("content", "")
+                                if content:
+                                    yield content
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as e:
+            logger.error(f"Ollama request failed: {e}")
+            yield "（宁宁的思绪断开了……请检查 Ollama 是否在运行）"
 
-                result = response.json()
-                return result.get("response", "").strip()
-        except httpx.HTTPError as e:
-            logger.error(f"Failed to connect to Ollama: {e}")
-            return "（宁宁正在思考中，但大脑连接断开了...请检查 Ollama 是否运行）"
+    async def chat(self, messages: List[Dict[str, str]]) -> str:
+        """Non-streaming convenience wrapper; collects all chunks into a string."""
+        chunks: List[str] = []
+        async for chunk in self.chat_stream(messages):
+            chunks.append(chunk)
+        return "".join(chunks)

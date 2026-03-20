@@ -45,6 +45,12 @@ def main() -> None:
     """Main execution function for initializing the vector database."""
     logger.info("Starting vector database initialization process...")
 
+    # Always start clean so the new cosine index format is written correctly.
+    for stale_path in (settings.vector_index_path, settings.knowledge_meta_path):
+        if os.path.exists(stale_path):
+            os.remove(stale_path)
+            logger.info(f"Removed stale index file: {stale_path}")
+
     # 1. Initialize core services
     embedding_svc = EmbeddingService()
     vector_store = FaissVectorStore(

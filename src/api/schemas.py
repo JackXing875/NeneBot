@@ -6,29 +6,22 @@ from pydantic import BaseModel, Field
 
 
 class ChatRequest(BaseModel):
-    """Schema for incoming chat requests from the user."""
-
-    query: str = Field(
-        ..., description="The user's input text.", example="要是惹你不快的话我道歉，抱歉"
+    query: str = Field(..., description="The user's input text.")
+    session_id: Optional[str] = Field(
+        None, description="Session ID for multi-turn memory. Omit to start a new session."
     )
-    top_k: int = Field(3, description="Number of historical references to retrieve.", ge=1, le=5)
+    top_k: int = Field(3, description="Number of RAG references to retrieve.", ge=1, le=10)
 
 
 class ReferenceMeta(BaseModel):
-    """Schema for retrieved historical references."""
-
     historical_query: str
     bot_response: str
-    distance_score: float
+    similarity_score: float = Field(..., description="Cosine similarity (0–1, higher = better).")
 
 
 class ChatResponse(BaseModel):
-    """Schema for the API response."""
-
-    reply: str = Field(..., description="The generated response from Ningning.")
+    reply: str = Field(..., description="Generated response from Nene.")
+    session_id: str = Field(..., description="Session ID; pass back on subsequent turns.")
     references: List[ReferenceMeta] = Field(
-        default_factory=list, description="The retrieved context used."
-    )
-    prompt_used: Optional[str] = Field(
-        None, description="The actual prompt sent to the LLM (for debugging)."
+        default_factory=list, description="RAG context used."
     )
