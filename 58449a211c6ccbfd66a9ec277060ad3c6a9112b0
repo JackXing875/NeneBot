@@ -1,0 +1,47 @@
+src/main.py
+  08095cff7cbc4d31 3,5,11,16,25-57,61,63,75,99,107-114,118-125
+requirements.txt
+  08095cff7cbc4d31 6,8-13
+frontend/src/App.vue
+  08095cff7cbc4d31 100-102
+frontend/vite.config.js
+  08095cff7cbc4d31 10-17
+src/core/config.py
+  08095cff7cbc4d31 5-13,17,27-29,31,33,36-39,41,45-54,59-60,62,67
+src/infrastructure/llm_base.py
+  08095cff7cbc4d31 1-26
+railway.toml
+  08095cff7cbc4d31 1-14
+README.md
+  08095cff7cbc4d31 14,31-32,42,60,67-69,71,79-94,101,148-149,151-152,163-166
+src/infrastructure/llm_client.py
+  08095cff7cbc4d31 10,15-16,21-22
+src/infrastructure/llm_claude.py
+  08095cff7cbc4d31 1-49
+src/infrastructure/llm_openai_compat.py
+  08095cff7cbc4d31 1-48
+README_ch.md
+  08095cff7cbc4d31 72
+.env.example
+  08095cff7cbc4d31 1-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "58449a211c6ccbfd66a9ec277060ad3c6a9112b0",
+  "prompts": {
+    "08095cff7cbc4d31": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bff18799-970d-4c23-b7d8-7c01c3861c7a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Schrieffer <xjack875@gmail.com>",
+      "messages": [],
+      "total_additions": 328,
+      "total_deletions": 56,
+      "accepted_lines": 325,
+      "overriden_lines": 0
+    }
+  }
+}
