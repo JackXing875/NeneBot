@@ -7,22 +7,19 @@ from typing import AsyncGenerator, Dict, List
 import httpx
 
 from src.core.config import settings
+from src.infrastructure.llm_base import BaseLLMClient
 
 logger = logging.getLogger(__name__)
 
 
-class OllamaClient:
-    """Async client for Ollama's /api/chat endpoint.
-
-    Supports:
-    - Token-level streaming via chat_stream() (for SSE endpoints)
-    - Full-response await via chat() (fallback / testing)
-    """
+class OllamaClient(BaseLLMClient):
+    """Async client for Ollama's /api/chat endpoint (local development)."""
 
     def __init__(self) -> None:
         self.chat_endpoint = f"{settings.ollama_base_url}/api/chat"
         self.model_name = settings.llm_model_name
-        self._options = {"temperature": 0.3, "top_p": 0.85}
+        self._options = {"temperature": 0.7, "top_p": 0.9}
+        logger.info(f"OllamaClient initialized: model={self.model_name}")
 
     async def chat_stream(
         self, messages: List[Dict[str, str]]
@@ -57,10 +54,3 @@ class OllamaClient:
         except Exception as e:
             logger.error(f"Ollama request failed: {e}")
             yield "（宁宁的思绪断开了……请检查 Ollama 是否在运行）"
-
-    async def chat(self, messages: List[Dict[str, str]]) -> str:
-        """Non-streaming convenience wrapper; collects all chunks into a string."""
-        chunks: List[str] = []
-        async for chunk in self.chat_stream(messages):
-            chunks.append(chunk)
-        return "".join(chunks)

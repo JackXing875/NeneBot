@@ -97,7 +97,9 @@ const chatContainer = ref(null);
 // Session ID – persisted in localStorage so memory survives page reloads.
 const sessionId = ref(null);
 
-const STREAM_URL  = 'http://127.0.0.1:8000/v1/chat/stream';
+// Dev:  Vite proxy forwards /v1/* → http://127.0.0.1:8000
+// Prod: same origin (FastAPI serves both frontend and API)
+const STREAM_URL  = '/v1/chat/stream';
 const SESSION_KEY = 'nenebot_session_id';
 
 onMounted(() => {

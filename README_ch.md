@@ -10,7 +10,7 @@
  <div>&nbsp;</div>
 
 <p align="center">
-  <b>基于检索增强生成 (RAG) 架构的绫地宁宁本地大模型对话服务</b><br>
+  <b>基于检索增强生成 (RAG) 架构的绫地宁宁 AI 对话服务，支持本地与云端 LLM</b><br>
   <i>"メンカタカラメヤサイダブルニンニクアブラマシマシ！"</i>
 </p>
 
@@ -27,7 +27,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Ollama-Local_LLM-black.svg?style=flat-square&logo=ollama&logoColor=white" alt="Ollama">
-  <img src="https://img.shields.io/badge/Qwen-2.5-blue.svg?style=flat-square&logo=alibabacloud&logoColor=white" alt="Qwen">
+  <img src="https://img.shields.io/badge/Claude-API-D97706.svg?style=flat-square&logo=anthropic&logoColor=white" alt="Claude">
+  <img src="https://img.shields.io/badge/DeepSeek-API-4F46E5.svg?style=flat-square" alt="DeepSeek">
   <img src="https://img.shields.io/badge/FAISS-Vector_DB-1877F2.svg?style=flat-square&logo=meta&logoColor=white" alt="FAISS">
 
 </p>
@@ -38,7 +39,7 @@
 
 <div>&nbsp;</div>
 
-> 端到端纯本地 RAG 对话型 AI，结合 FAISS 语义检索与 Qwen2.5 本地推理引擎。支持沉浸式 Vue 3 视觉交互界面与稳健的相似度阈值熔断机制，展现了在消除“幻觉”与“OOC”方面的高保真 Galgame 角色重现能力，适用于互动式虚拟陪伴场景。
+> RAG 对话型 AI，结合 FAISS 语义检索与可插拔 LLM 后端（Claude、DeepSeek 或本地 Ollama）。支持多轮会话记忆、SSE 流式输出、沉浸式 Vue 3 视觉界面与余弦相似度阈值熔断，在消除"幻觉"与"OOC"方面表现出色。
 
 <div>&nbsp;</div>
 
@@ -54,18 +55,21 @@
 
 传统的二次元角色 AI 往往面临两个致命痛点：**“幻觉”**（乱编设定）和 **“OOC”**（Out Of Character，语气崩坏）。常规的微调不仅耗费显卡，而且难以彻底根除这些问题。
 
-**NeneBot** 是一次将**RAG（检索增强生成）技术**应用于 *Galgame* 角色模拟的尝试。我们摒弃了昂贵的云端 *API*，完全在本地构建：
-* **外挂记忆引擎**：将《魔女的夜宴》原版剧本切片并向量化，让 AI 拥有“真物”般的记忆。
+专注于以 RAG 技术重现 Galgame 角色：
+* **外挂记忆引擎**：将《魔女的夜宴》原版剧本切片并向量化，让 AI 拥有"真物"般的记忆。
 * **原汁原味还原**：模型被强制要求参考检索到的原版台词进行输出，100% 还原宁宁温柔、害羞的性格特点。
+* **可插拔 LLM 后端**：一行环境变量在本地 Ollama 与云端 API（Claude、DeepSeek）之间自由切换。
 * **极致还原游戏**：告别简陋的控制台，打造沉浸式的现代 Galgame 视觉交互界面。
 
 ---
 
 ## 核心特性
 
-* **极速本地推理**：依托 Ollama 驱动 Qwen2.5 模型，断网也能和宁宁流畅对话，保护绝对隐私。
+* **灵活的 LLM 后端**：本地 Ollama 保护隐私，云端 Claude / DeepSeek 提供更高质量，`LLM_PROVIDER` 一行切换，无需改代码。
+* **多轮对话记忆**：滑动窗口式会话历史，宁宁能记住上下文，不再"失忆"。
+* **流式实时输出**：SSE 逐 token 推送，原生打字机体验。
 * **毫秒级语义检索**：使用 Meta 开源的 FAISS 向量数据库，配合 `bge-small-zh` 模型，精准定位历史剧本。
-* **阈值熔断机制**：独创 `match_threshold` 相似度过滤，宁宁遇到不懂的话题会自由发挥，绝不“驴头不对马嘴”。
+* **阈值熔断机制**：`match_threshold` 余弦相似度过滤（默认 `0.55`），宁宁遇到不懂的话题会自由发挥，绝不”驴头不对马嘴”。
 * **沉浸式视觉体验**：Vue 3 + Vite 驱动的深色磨砂玻璃 UI，支持打字机特效与动态呼吸感布局。
 * **全自动开箱即用**：提供 Windows/Linux 双平台一键环境装载与启动脚本，无需任何终端知识。
 
@@ -80,7 +84,7 @@
 **第一步：安装两大基础软件（如果你的电脑已有，可跳过）**
 1. 下载并安装 [Python 3.10+](https://www.python.org/downloads/)。**【极其重要】**：安装界面底部一定要勾选 <kbd>Add Python to PATH</kbd>！
 2. 下载并安装 [Node.js (LTS版本)](https://nodejs.org/)，一路点击下一步即可。
-3. 下载并安装 [Ollama Windows版](https://ollama.com/download/windows)。
+3. *（仅使用本地 Ollama 时需要）* 下载并安装 [Ollama Windows版](https://ollama.com/download/windows)。
 
 **第二步：下载 NeneBot 源码**
 在 GitHub 页面点击绿色的 `Code` 按钮，选择 `Download ZIP`。解压到你的电脑中（建议路径全英文，如 `D:\NeneBot`）。
@@ -127,12 +131,13 @@ NeneBot/
 ├── 📂 src/              # FastAPI 核心后端服务
 │   ├── api/             # 路由控制与 Pydantic 数据校验
 │   ├── core/            # pydantic-settings 配置中心与全局异常处理
-│   ├── infrastructure/  # 基础设施适配层 (FAISS客户端, Ollama桥接)
-│   └── services/        # 核心业务逻辑 (RAG 调度管线, Embedding 服务)
+│   ├── infrastructure/  # 基础设施适配层 (FAISS, Ollama, Claude, DeepSeek)
+│   └── services/        # 核心业务逻辑 (RAG 管线, Embedding, 会话记忆)
 ├── 📂 scripts/          # 自动化运维工具箱 (装载、启动、Linter检查)
+├── 📄 railway.toml      # Railway 一键部署配置
+├── 📄 .env.example      # 环境变量模板
 ├── 📄 pyproject.toml    # Ruff & Mypy 工业级代码规范配置
 └── 📄 requirements.txt  # Python 依赖清单
-
 ```
 
 ---
@@ -141,9 +146,10 @@ NeneBot/
 
 对于有开发能力的玩家，你可以通过修改以下文件来“调教”属于你的宁宁：
 
-* **修改严格程度**：在 `src/services/rag_pipeline.py` 中调整 `self.match_threshold`（默认 0.8）。值越小，宁宁的回答越死板（必须完全贴合剧本）；值越大，宁宁越倾向于自由发挥。
+* **切换 LLM**：在 `.env` 中设置 `LLM_PROVIDER=claude / deepseek / ollama`，并填入对应的 API Key，详见 `.env.example`。
+* **修改严格程度**：调整 `MATCH_THRESHOLD`（默认 `0.55`），值越小回答越贴合剧本，值越大越自由发挥。
 * **修改立绘与背景**：替换 `frontend/public/` 目录下的 `nene_sprite.png` 和 `bg_room.jpg`，无需重启即可生效（Vite 热更新支持）。
-* **修改提示词**：在 `rag_pipeline.py` 的 `self.system_prompt` 中，可以增加新的性格设定指令。
+* **修改角色设定**：编辑 `src/services/rag_pipeline.py` 中的 `_CHARACTER_CARD` 常量，增加新的性格设定指令。
 
 ---
 
@@ -157,13 +163,11 @@ NeneBot/
 </details>
 
 <details>
-<summary><b>2. 聊天框一直显示“宁宁正在思考”，最后提示“大脑连接断开”？</b></summary>
+<summary><b>2. 出现"宁宁的思绪断开了"错误提示？</b></summary>
 
+**使用本地 Ollama 时**：Ollama 服务未启动，或内存/显存不足。尝试手动运行 `ollama run qwen2.5`。WSL/Linux 用户还需确认系统代理没有拦截本地请求（`unset http_proxy`）。
 
-
-
-
-通常是因为 Ollama 服务未启动，或者你的电脑内存/显存不足以运行 Qwen2.5 模型。请检查后台是否有内存溢出，或者尝试在终端手动运行 `ollama run qwen2.5` 测试引擎是否正常。
+**使用云端 API 时**：检查 `.env` 中的 `ANTHROPIC_API_KEY` 或 `OPENAI_COMPAT_API_KEY` 是否正确，以及 `LLM_PROVIDER` 是否与所用 Key 匹配。
 </details>
 
 <details>

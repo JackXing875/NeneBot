@@ -11,7 +11,7 @@
  <div>&nbsp;</div>
 
 <p align="center">
-  <b>A Local LLM Conversational Agent for Ayachi Nene powered by Retrieval-Augmented Generation</b><br>
+  <b>A RAG-Powered Conversational AI for Ayachi Nene — runs locally or on any cloud LLM</b><br>
   <i>"メンカタカラメヤサイダブルニンニクアブラマシマシ！"</i>
 </p>
 
@@ -28,7 +28,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Ollama-Local_LLM-black.svg?style=flat-square&logo=ollama&logoColor=white" alt="Ollama">
-  <img src="https://img.shields.io/badge/Qwen-2.5-blue.svg?style=flat-square&logo=alibabacloud&logoColor=white" alt="Qwen">
+  <img src="https://img.shields.io/badge/Claude-API-D97706.svg?style=flat-square&logo=anthropic&logoColor=white" alt="Claude">
+  <img src="https://img.shields.io/badge/DeepSeek-API-4F46E5.svg?style=flat-square" alt="DeepSeek">
   <img src="https://img.shields.io/badge/FAISS-Vector_DB-1877F2.svg?style=flat-square&logo=meta&logoColor=white" alt="FAISS">
 </p>
 
@@ -38,7 +39,7 @@
 
 <div>&nbsp;</div>
 
-> An end-to-end, privacy-first local RAG conversational AI combining FAISS semantic retrieval and Qwen2.5 inference. Features a modern Vue 3 immersive Galgame UI and robust similarity-threshold filtering, demonstrating highly authentic, hallucination-free character reproduction for interactive virtual companionship.
+> A RAG conversational AI combining FAISS semantic retrieval with pluggable LLM backends (Claude, DeepSeek, or local Ollama). Features multi-turn session memory, SSE token streaming, a modern Vue 3 immersive Galgame UI, and similarity-threshold filtering for hallucination-free character reproduction.
 
 <div>&nbsp;</div>
 
@@ -53,18 +54,21 @@
 
 Traditional AI role-playing bots often suffer from two fatal flaws: **"Hallucinations"** (making up fake lore) and **"OOC"** (Out of Character responses). While conventional Fine-tuning can help, it is hardware-intensive and rarely eradicates these issues completely.
 
-**NeneBot** is an attempt to bring **RAG (Retrieval-Augmented Generation)** architecture to *Galgame* character simulation. We completely bypassed expensive cloud APIs to build a 100% local, privacy-first engine:
+**NeneBot** is an attempt to bring **RAG (Retrieval-Augmented Generation)** architecture to *Galgame* character simulation:
 * **External Memory Engine**: By slicing and vectorizing the original script of *Sanoba Witch*, we give the AI "true" memories.
 * **Authentic Reproduction**: The LLM is forced to reference retrieved original dialogue, perfectly capturing Nene's gentle and shy personality.
+* **Pluggable LLM Backend**: Swap between local Ollama and cloud APIs (Claude, DeepSeek) with a single environment variable — no code changes required.
 * **Ultimate Front-end Aesthetics**: Ditching clunky terminal interfaces for an immersive, modern visual novel (Galgame) UI.
 
 ---
 
 ## Features
 
-* **Lightning-Fast Local Inference**: Powered by Ollama and Qwen 2.5, enjoy seamless conversations completely offline. Absolute privacy guaranteed.
+* **Flexible LLM Backend**: Use local Ollama (Qwen 2.5, Llama, etc.) for full privacy, or plug in a cloud API (Claude, DeepSeek) via a single `LLM_PROVIDER` env var for higher quality.
+* **Multi-Turn Memory**: Per-session conversation history (sliding window) keeps Nene contextually aware across turns.
+* **Real-Time Token Streaming**: SSE-based streaming delivers a native typewriter effect — responses appear word by word.
 * **Millisecond Semantic Retrieval**: Utilizes Meta's FAISS vector database alongside the `bge-small-zh` embedding model to pinpoint relevant historical scripts.
-* **Threshold Fallback Mechanism**: Features a custom `match_threshold` filter. If the topic is unfamiliar, Nene seamlessly transitions to zero-shot character playing rather than forcing irrelevant memories.
+* **Threshold Fallback Mechanism**: Features a custom `match_threshold` filter (cosine similarity, default `0.55`). If the topic is unfamiliar, Nene seamlessly transitions to zero-shot character playing rather than forcing irrelevant memories.
 * **Immersive Visual Experience**: A stunning Vue 3 + Vite front-end featuring a dark glassmorphism UI, typewriter effects, and dynamic breathing layouts.
 * **Out-of-the-Box Automation**: Includes 1-click installation and startup scripts for both Windows and Linux. No terminal anxiety required.
 
@@ -72,14 +76,29 @@ Traditional AI role-playing bots often suffer from two fatal flaws: **"Hallucina
 
 ## Quick Start
 
-We have prepared a "babysitter-level" quick start guide for users without a technical background. Please choose the steps based on your OS:
+### Option A — One-Click Cloud Deploy (no local setup)
+
+Deploy to [Railway](https://railway.app) in under 5 minutes. Users only need a browser URL.
+
+1. Fork this repo and connect it to Railway.
+2. In Railway's **Variables** panel, set:
+   ```
+   LLM_PROVIDER=deepseek
+   OPENAI_COMPAT_API_KEY=sk-...
+   ```
+3. Railway builds the frontend, installs deps, and starts the server automatically.
+4. Share the generated `*.railway.app` URL — done.
+
+---
+
+### Option B — Local Setup
 
 ### For Windows Users
 
 **Step 1: Install Prerequisites (Skip if already installed)**
 1. Download and install [Python 3.10+](https://www.python.org/downloads/). **[CRITICAL]**: Ensure you check <kbd>Add Python to PATH</kbd> at the bottom of the installer!
 2. Download and install [Node.js (LTS version)](https://nodejs.org/).
-3. Download and install [Ollama for Windows](https://ollama.com/download/windows).
+3. *(Only if using local Ollama)* Download and install [Ollama for Windows](https://ollama.com/download/windows).
 
 **Step 2: Download NeneBot**
 Click the green `Code` button on this GitHub page and select `Download ZIP`. Extract it to a folder on your PC (e.g., `D:\NeneBot`).
@@ -126,12 +145,13 @@ NeneBot/
 ├── 📂 src/              # FastAPI core backend service
 │   ├── api/             # Routing and Pydantic data validation
 │   ├── core/            # pydantic-settings config and global exceptions
-│   ├── infrastructure/  # External adapters (FAISS client, Ollama bridge)
-│   └── services/        # Core business logic (RAG pipeline, Embeddings)
+│   ├── infrastructure/  # External adapters (FAISS, Ollama, Claude, DeepSeek)
+│   └── services/        # Core business logic (RAG pipeline, Embeddings, Sessions)
 ├── 📂 scripts/          # DevOps toolbox (Setup, Run, Linters)
+├── 📄 railway.toml      # One-click Railway deployment config
+├── 📄 .env.example      # Environment variable template
 ├── 📄 pyproject.toml    # Industrial linter configs (Ruff & Mypy)
 └── 📄 requirements.txt  # Python dependency list
-
 ```
 
 ---
@@ -140,9 +160,10 @@ NeneBot/
 
 For developers who want to tweak the bot, you can easily customize Nene:
 
-* **Adjust Strictness**: Modify `self.match_threshold` (default 0.8) in `src/services/rag_pipeline.py`. Lower values make her stick strictly to the script; higher values allow more creative freedom.
-* **Change Sprites & Backgrounds**: Replace `nene_sprite.png` and `bg_room.jpg` in the `frontend/public/` directory. Changes apply instantly thanks to Vite HMR.
-* **Modify System Prompt**: Update `self.system_prompt` in `rag_pipeline.py` to add new personality traits or instructions.
+* **Switch LLM Provider**: Set `LLM_PROVIDER` in `.env` to `ollama`, `claude`, or `deepseek`. See `.env.example` for the full list of required keys.
+* **Adjust Strictness**: Modify `MATCH_THRESHOLD` (default `0.55`) in `.env` or directly in `src/services/rag_pipeline.py`. Lower values make her stick strictly to the script; higher values allow more creative freedom.
+* **Change Sprites & Backgrounds**: Replace `nene_sprite.png` and `bg_room.jpg` in the `frontend/public/` directory. Changes apply instantly in dev thanks to Vite HMR.
+* **Modify Character Persona**: Edit the `_CHARACTER_CARD` constant in `src/services/rag_pipeline.py` to add new personality traits or instructions.
 
 ---
 
@@ -159,13 +180,11 @@ You either haven't installed Python/Node.js, or forgot to add them to your envir
 </details>
 
 <details>
-<summary><b>2. The chat is stuck on "Thinking...", followed by a connection error?</b></summary>
+<summary><b>2. The chat shows a connection error or "Nene's thoughts disconnected"?</b></summary>
 
+**If using Ollama:** The Ollama service may not be running, or your machine ran out of VRAM/RAM. Try running `ollama run qwen2.5` manually. On Linux/WSL, also ensure no system proxy is intercepting localhost traffic (`unset http_proxy`).
 
-
-
-
-This usually means the Ollama service isn't running, or your machine ran out of VRAM/RAM to load the Qwen 2.5 model. Check your task manager, or try running <code>ollama run qwen2.5</code> manually in the terminal to diagnose the engine.
+**If using a cloud API:** Verify that your `ANTHROPIC_API_KEY` or `OPENAI_COMPAT_API_KEY` is set correctly in `.env` and that `LLM_PROVIDER` matches.
 </details>
 
 <details>

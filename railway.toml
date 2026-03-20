@@ -1,0 +1,14 @@
+[build]
+builder = "NIXPACKS"
+# Install Python deps, then build the Vue frontend into frontend/dist
+buildCommand = "pip install -r requirements.txt && cd frontend && npm install && npm run build && cd .."
+
+[deploy]
+# FastAPI serves both the API (/v1/*) and the compiled frontend (/)
+startCommand = "uvicorn src.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 300  # Allow time for embedding model download on first deploy
+
+[[volumes]]
+# Persist the vector index and HuggingFace model cache across deploys
+mountPath = "/data"
