@@ -37,4 +37,4 @@ jobs:
         run: python -m ruff check src tests
 
       - name: Pytest
-        run: python -m pytest
+        run: PYTHONPATH=. python -m pytest

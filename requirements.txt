@@ -1,22 +1,18 @@
-# --- API & Web Framework ---
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 pydantic>=2.6.0
 pydantic-settings>=2.2.0
 aiofiles>=23.0.0
 
-# --- LLM Clients ---
 anthropic>=0.40.0
 openai>=1.50.0
 httpx>=0.27.0
 redis>=5.0.0
 
-# --- Vector Database & Embeddings ---
 faiss-cpu>=1.8.0
 sentence-transformers>=2.5.0
 torch>=2.2.0 --index-url https://download.pytorch.org/whl/cpu
 
-# --- Utilities ---
 numpy>=1.26.0
 tqdm>=4.66.0
 python-dotenv>=1.0.0
