@@ -218,7 +218,9 @@ venv/
 env/
 .env
 
-vector_store/
+/vector_store/
+!src/infrastructure/vector_store/
+!src/infrastructure/vector_store/*.py
 *.jsonl
 *.json
 *.bin
