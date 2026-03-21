@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import AsyncGenerator, Dict, List
+from typing import AsyncIterator, Dict, List
 
 import httpx
 
@@ -23,7 +23,7 @@ class OllamaClient(BaseLLMClient):
 
     async def chat_stream(
         self, messages: List[Dict[str, str]]
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncIterator[str]:
         """Yields response content chunks from Ollama's streaming API."""
         payload = {
             "model": self.model_name,
@@ -31,26 +31,22 @@ class OllamaClient(BaseLLMClient):
             "stream": True,
             "options": self._options,
         }
-        try:
-            # trust_env=False prevents httpx from picking up http_proxy / HTTP_PROXY
-            # env vars, which would route localhost Ollama requests through a proxy
-            # and cause 502 Bad Gateway errors.
-            async with httpx.AsyncClient(trust_env=False) as client:
-                async with client.stream(
-                    "POST", self.chat_endpoint, json=payload, timeout=120.0
-                ) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if not line:
-                            continue
-                        try:
-                            data = json.loads(line)
-                            if not data.get("done"):
-                                content = data.get("message", {}).get("content", "")
-                                if content:
-                                    yield content
-                        except json.JSONDecodeError:
-                            continue
-        except Exception as e:
-            logger.error(f"Ollama request failed: {e}")
-            yield "（宁宁的思绪断开了……请检查 Ollama 是否在运行）"
+        # trust_env=False prevents httpx from picking up http_proxy / HTTP_PROXY
+        # env vars, which would route localhost Ollama requests through a proxy
+        # and cause 502 Bad Gateway errors.
+        async with httpx.AsyncClient(trust_env=False) as client:
+            async with client.stream(
+                "POST", self.chat_endpoint, json=payload, timeout=120.0
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                        if not data.get("done"):
+                            content = data.get("message", {}).get("content", "")
+                            if content:
+                                yield content
+                    except json.JSONDecodeError:
+                        continue

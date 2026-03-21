@@ -1,7 +1,7 @@
 """Abstract base class for all LLM clients."""
 
 from abc import ABC, abstractmethod
-from typing import AsyncGenerator, Dict, List
+from typing import AsyncIterator, Dict, List
 
 
 class BaseLLMClient(ABC):
@@ -12,9 +12,9 @@ class BaseLLMClient(ABC):
     """
 
     @abstractmethod
-    async def chat_stream(
+    def chat_stream(
         self, messages: List[Dict[str, str]]
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncIterator[str]:
         """Yield response tokens one by one."""
         ...
 

@@ -1,9 +1,10 @@
 """OpenAI-compatible API client (DeepSeek, Qwen-API, etc.)."""
 
 import logging
-from typing import AsyncGenerator, Dict, List
+from typing import AsyncIterator, Dict, List, cast
 
 from openai import AsyncOpenAI
+from openai.types.chat import ChatCompletionMessageParam
 
 from src.core.config import settings
 from src.infrastructure.llm_base import BaseLLMClient
@@ -31,18 +32,14 @@ class OpenAICompatClient(BaseLLMClient):
 
     async def chat_stream(
         self, messages: List[Dict[str, str]]
-    ) -> AsyncGenerator[str, None]:
-        try:
-            stream = await self._client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                stream=True,
-                temperature=0.7,
-                max_tokens=512,
-            )
-            async for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
-        except Exception as e:
-            logger.error(f"OpenAI-compat API error: {e}")
-            yield "（宁宁的思绪断开了……请检查 API Key 与 Base URL 是否正确）"
+    ) -> AsyncIterator[str]:
+        stream = await self._client.chat.completions.create(
+            model=self.model,
+            messages=cast(List[ChatCompletionMessageParam], messages),
+            stream=True,
+            temperature=0.7,
+            max_tokens=512,
+        )
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content

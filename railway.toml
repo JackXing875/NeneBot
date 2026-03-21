@@ -11,4 +11,4 @@ healthcheckTimeout = 300  # Allow time for embedding model download on first dep
 
 [[volumes]]
 # Persist the vector index and HuggingFace model cache across deploys
-mountPath = "/data"
+mountPath = "/app/vector_store"

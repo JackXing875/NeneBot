@@ -1,55 +1,61 @@
 # ==========================================
-# Stage 1: Builder (Install dependencies)
+# Stage 1: Frontend builder
 # ==========================================
-FROM python:3.10-slim as builder
+FROM node:20-slim AS frontend-builder
 
-# Set environment variables to optimize Python execution
+WORKDIR /app/frontend
+
+COPY frontend/package*.json ./
+RUN npm ci --silent
+
+COPY frontend/ ./
+RUN npm run build
+
+# ==========================================
+# Stage 2: Python dependency builder
+# ==========================================
+FROM python:3.10-slim AS python-builder
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install build dependencies (e.g., for compiling C extensions if needed)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc build-essential && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy only the dependency file first to leverage Docker cache
 COPY requirements.txt .
-
-# Install dependencies into a virtual environment to isolate them
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # ==========================================
-# Stage 2: Runtime (Production image)
+# Stage 3: Runtime (Production image)
 # ==========================================
-FROM python:3.10-slim as runtime
+FROM python:3.10-slim AS runtime
 
-# Create a non-root user for security purposes
 RUN useradd -m -s /bin/bash appuser
 
 WORKDIR /app
 
-# Copy the virtual environment from the builder stage
-COPY --from=builder /opt/venv /opt/venv
-
-# Ensure the virtual environment is used
+COPY --from=python-builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy the actual application code
+# Application code
 COPY src/ ./src/
+COPY scripts/ ./scripts/
+COPY data/ ./data/
 
-# Change ownership of the application files to the non-root user
+# Compiled frontend
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+
 RUN chown -R appuser:appuser /app
 
-# Switch to the non-root user
 USER appuser
 
-# Expose the port the FastAPI application will run on
 EXPOSE 8000
 
-# Command to run the application using a production ASGI server
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Build vector index on first run if not present, then start API server
+CMD ["sh", "-c", "python scripts/init_vector_db.py || true && uvicorn src.main:app --host 0.0.0.0 --port 8000"]

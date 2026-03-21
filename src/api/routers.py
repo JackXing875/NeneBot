@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 
 from src.api.dependencies import get_llm_client, get_rag_pipeline, get_session_store
 from src.api.schemas import ChatRequest, ChatResponse, ReferenceMeta
-from src.infrastructure.llm_client import OllamaClient
+from src.infrastructure.llm_base import BaseLLMClient
 from src.services.rag_pipeline import RAGPipeline
 from src.services.session_store import SessionStore
 
@@ -21,9 +21,9 @@ chat_router = APIRouter(prefix="/v1", tags=["Chat"])
 @chat_router.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(
     request: ChatRequest,
-    rag: RAGPipeline = Depends(get_rag_pipeline),
-    llm: OllamaClient = Depends(get_llm_client),
-    sessions: SessionStore = Depends(get_session_store),
+    rag: RAGPipeline = Depends(get_rag_pipeline),  # noqa: B008
+    llm: BaseLLMClient = Depends(get_llm_client),  # noqa: B008
+    sessions: SessionStore = Depends(get_session_store),  # noqa: B008
 ) -> ChatResponse:
     """Non-streaming chat – waits for the full reply before responding."""
     session_id = sessions.get_or_create(request.session_id)
@@ -48,15 +48,16 @@ async def chat_endpoint(
 @chat_router.post("/chat/stream")
 async def chat_stream_endpoint(
     request: ChatRequest,
-    rag: RAGPipeline = Depends(get_rag_pipeline),
-    llm: OllamaClient = Depends(get_llm_client),
-    sessions: SessionStore = Depends(get_session_store),
+    rag: RAGPipeline = Depends(get_rag_pipeline),  # noqa: B008
+    llm: BaseLLMClient = Depends(get_llm_client),  # noqa: B008
+    sessions: SessionStore = Depends(get_session_store),  # noqa: B008
 ) -> StreamingResponse:
-    """SSE streaming chat – pushes tokens as they arrive from Ollama.
+    """SSE streaming chat – pushes tokens as they arrive from the LLM.
 
     Event types:
         meta  – {"type":"meta", "session_id":"...", "references":[...]}
         chunk – {"type":"chunk", "content":"..."}
+        error – {"type":"error", "message":"..."}
         done  – {"type":"done"}
     """
     session_id = sessions.get_or_create(request.session_id)
@@ -81,11 +82,12 @@ async def chat_stream_endpoint(
                 collected.append(chunk)
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
-            sessions.add_turn(session_id, request.query, "".join(collected))
         except Exception as e:
             logger.error(f"event_stream error: {e}")
-            err_chunk = "（宁宁的思绪突然断开了……）"
-            yield f"data: {json.dumps({'type': 'chunk', 'content': err_chunk})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'message': '（宁宁的思绪突然断开了……）'})}\n\n"
+        else:
+            # Only persist the turn when no exception occurred
+            sessions.add_turn(session_id, request.query, "".join(collected))
         finally:
             # 'done' MUST always be sent so the client exits its read loop.
             yield f"data: {json.dumps({'type': 'done'})}\n\n"

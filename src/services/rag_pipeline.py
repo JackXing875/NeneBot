@@ -1,7 +1,7 @@
 """Core RAG pipeline: retrieval, filtering, and prompt construction."""
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.core.config import settings
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
@@ -52,7 +52,7 @@ class RAGPipeline:
     # Retrieval
     # ------------------------------------------------------------------
 
-    def retrieve_and_filter(self, query: str, top_k: int = 3) -> List[Dict]:
+    def retrieve_and_filter(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """Embed query, search FAISS, keep results above cosine threshold."""
         query_embedding = self.embedding_svc.encode([query])[0]
         raw = self.vector_store.search(query_embedding, top_k=top_k)
@@ -70,8 +70,8 @@ class RAGPipeline:
     def build_messages(
         self,
         query: str,
-        context_results: List[Dict],
-        history: Optional[List[Dict]] = None,
+        context_results: List[Dict[str, Any]],
+        history: Optional[List[Dict[str, str]]] = None,
     ) -> List[Dict[str, str]]:
         """Assemble the ChatML messages list for /api/chat.
 
@@ -107,8 +107,8 @@ class RAGPipeline:
         self,
         query: str,
         top_k: int = 3,
-        history: Optional[List[Dict]] = None,
-    ) -> Tuple[List[Dict[str, str]], List[Dict]]:
+        history: Optional[List[Dict[str, str]]] = None,
+    ) -> Tuple[List[Dict[str, str]], List[Dict[str, Any]]]:
         """Returns (messages_for_llm, filtered_contexts)."""
         contexts = self.retrieve_and_filter(query, top_k)
         messages = self.build_messages(query, contexts, history)

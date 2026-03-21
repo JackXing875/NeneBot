@@ -7,21 +7,35 @@ echo "======================================================="
 echo "        NeneBot - Runtime Service Launcher"
 echo "======================================================="
 
-echo "[0/2] Checking Ollama runtime..."
-
-if ! command -v ollama &> /dev/null; then
-    echo "[ERROR] Ollama is not installed."
-    echo "Install it via: https://ollama.com"
-    exit 1
+# Load .env so we can inspect LLM_PROVIDER
+if [ -f .env ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source .env
+    set +a
 fi
 
-if ! pgrep -x "ollama" > /dev/null; then
-    echo "[INFO] Ollama not running. Starting service..."
-    ollama serve > /dev/null 2>&1 &
-    sleep 3
-    echo "[OK] Ollama service started."
+LLM_PROVIDER="${LLM_PROVIDER:-ollama}"
+
+if [ "$LLM_PROVIDER" = "ollama" ]; then
+    echo "[0/2] Checking Ollama runtime..."
+
+    if ! command -v ollama &> /dev/null; then
+        echo "[ERROR] Ollama is not installed."
+        echo "Install it via: https://ollama.com"
+        exit 1
+    fi
+
+    if ! pgrep -x "ollama" > /dev/null; then
+        echo "[INFO] Ollama not running. Starting service..."
+        ollama serve > /dev/null 2>&1 &
+        sleep 3
+        echo "[OK] Ollama service started."
+    else
+        echo "[OK] Ollama runtime already active."
+    fi
 else
-    echo "[OK] Ollama runtime already active."
+    echo "[0/2] Skipping Ollama check (LLM_PROVIDER=${LLM_PROVIDER})."
 fi
 
 cleanup() {
@@ -37,7 +51,6 @@ cleanup() {
     fi
 
     echo "[OK] Backend and frontend services stopped."
-    echo "[INFO] Ollama remains running in the background."
     exit 0
 }
 
@@ -45,12 +58,16 @@ trap cleanup SIGINT SIGTERM
 
 echo "[1/2] Starting backend service (FastAPI on port 8000)..."
 
-python -m src.main &
+# Activate virtual environment if it exists
+if [ -f "venv/bin/activate" ]; then
+    # shellcheck disable=SC1091
+    source venv/bin/activate
+fi
+
+python -m uvicorn src.main:app --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
 
 sleep 2
-
-# Optional: health check could be added here
 
 echo "[OK] Backend service launched (PID: $BACKEND_PID)."
 

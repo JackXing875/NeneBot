@@ -60,4 +60,5 @@ class EmbeddingService:
         )
 
         # Convert numpy arrays to nested Python lists for the generic interface
-        return embeddings.tolist()
+        result: List[List[float]] = embeddings.tolist()  # type: ignore[assignment]
+        return result

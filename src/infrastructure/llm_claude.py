@@ -1,9 +1,10 @@
 """Claude API client (via Anthropic SDK)."""
 
 import logging
-from typing import AsyncGenerator, Dict, List
+from typing import AsyncIterator, Dict, List, cast
 
 import anthropic
+from anthropic.types import MessageParam
 
 from src.core.config import settings
 from src.infrastructure.llm_base import BaseLLMClient
@@ -25,7 +26,7 @@ class ClaudeClient(BaseLLMClient):
 
     async def chat_stream(
         self, messages: List[Dict[str, str]]
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncIterator[str]:
         system_content = ""
         chat_messages: List[Dict[str, str]] = []
         for msg in messages:
@@ -34,16 +35,12 @@ class ClaudeClient(BaseLLMClient):
             else:
                 chat_messages.append(msg)
 
-        try:
-            async with self._client.messages.stream(
-                model=self.model,
-                max_tokens=512,
-                system=system_content,
-                messages=chat_messages,
-                temperature=1.0,  # anthropic sdk controls creativity differently
-            ) as stream:
-                async for text in stream.text_stream:
-                    yield text
-        except Exception as e:
-            logger.error(f"Claude API error: {e}")
-            yield "（宁宁的思绪断开了……请检查 Anthropic API Key 是否正确）"
+        async with self._client.messages.stream(
+            model=self.model,
+            max_tokens=512,
+            system=system_content,
+            messages=cast(List[MessageParam], chat_messages),
+            temperature=1.0,  # anthropic sdk controls creativity differently
+        ) as stream:
+            async for text in stream.text_stream:
+                yield text

@@ -21,25 +21,40 @@ fi
 
 echo "[OK] Python3 and Node.js environment verified."
 
-echo "[2/5] Checking local LLM runtime (Ollama)..."
+# Load .env to check LLM_PROVIDER (default to ollama if not set)
+if [ -f .env ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source .env
+    set +a
+fi
 
-if ! command -v ollama &> /dev/null; then
-    echo "[INFO] Ollama not detected. Installing runtime..."
-    curl -fsSL https://ollama.com/install.sh | sh
+LLM_PROVIDER="${LLM_PROVIDER:-ollama}"
+
+if [ "$LLM_PROVIDER" = "ollama" ]; then
+    echo "[2/5] Checking local LLM runtime (Ollama)..."
+
+    if ! command -v ollama &> /dev/null; then
+        echo "[INFO] Ollama not detected. Installing runtime..."
+        curl -fsSL https://ollama.com/install.sh | sh
+    else
+        echo "[OK] Ollama runtime detected."
+    fi
+
+    echo "[3/5] Starting Ollama service and pulling Qwen2.5 model..."
+
+    if ! pgrep -x "ollama" > /dev/null; then
+        echo "[INFO] Launching Ollama service..."
+        ollama serve > /dev/null 2>&1 &
+        sleep 3
+    fi
+
+    ollama pull qwen2.5
+    echo "[OK] Model installation completed."
 else
-    echo "[OK] Ollama runtime detected."
+    echo "[2/5] Skipping Ollama setup (LLM_PROVIDER=${LLM_PROVIDER})."
+    echo "[3/5] Skipping model pull (LLM_PROVIDER=${LLM_PROVIDER})."
 fi
-
-echo "[3/5] Starting Ollama service and pulling Qwen2.5 model..."
-
-if ! pgrep -x "ollama" > /dev/null; then
-    echo "[INFO] Launching Ollama service..."
-    ollama serve > /dev/null 2>&1 &
-    sleep 3
-fi
-
-ollama pull qwen2.5
-echo "[OK] Model installation completed."
 
 echo "[4/5] Setting up backend RAG engine..."
 
@@ -48,6 +63,7 @@ if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
 
+# shellcheck disable=SC1091
 source venv/bin/activate
 
 echo "[INFO] Installing backend dependencies..."

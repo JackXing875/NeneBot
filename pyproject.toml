@@ -24,7 +24,7 @@ target-version = "py310"
 # I: isort automatic import sorting
 # B: flake8-bugbear common bug traps
 select = ["E", "F", "I", "W", "B"]
-ignore = []
+ignore = ["B008"]
 
 # ==========================================
 # Strict Static Type Checking (Mypy)

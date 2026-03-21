@@ -4,7 +4,7 @@ import logging
 import sys
 
 
-def setup_logger():
+def setup_logger() -> logging.Logger:
     """Initializes the global logger with standard industrial formatting."""
     logging.basicConfig(
         level=logging.INFO,

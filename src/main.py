@@ -91,7 +91,6 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -100,7 +99,7 @@ def create_app() -> FastAPI:
     app.include_router(chat_router)
 
     @app.get("/health", tags=["Ops"])
-    async def health_check() -> dict:
+    async def health_check() -> dict[str, object]:
         vs: FaissVectorStore = app.state.vector_store
         return {
             "status": "ok",
