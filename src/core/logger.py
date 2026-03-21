@@ -3,13 +3,18 @@
 import logging
 import sys
 
+from src.core.observability import JsonFormatter
+
 
 def setup_logger() -> logging.Logger:
     """Initializes the global logger with standard industrial formatting."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
-    # Return the root logger
+    root = logging.getLogger()
+    if root.handlers:
+        return logging.getLogger("NeneBot")
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JsonFormatter())
+
+    root.setLevel(logging.INFO)
+    root.handlers = [handler]
     return logging.getLogger("NeneBot")

@@ -1,32 +1,46 @@
-"""In-memory session store for multi-turn conversation memory."""
+"""Session storage abstractions and in-memory implementation."""
 
 import uuid
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, List, Protocol
+
+ChatMessage = Dict[str, str]
 
 
-class SessionStore:
-    """Manages per-session conversation history (short-term memory).
+class SessionStore(Protocol):
+    """Interface for per-session chat history storage."""
 
-    Each session holds a sliding window of ChatML messages (user + assistant turns).
-    Sessions live in-process memory; they reset on server restart.
-    For persistence across restarts, replace with Redis/SQLite backend.
-    """
+    backend_name: str
+
+    def get_or_create(self, session_id: str | None) -> str:
+        """Return an existing session id or create a new one."""
+
+    def get_history(self, session_id: str) -> List[ChatMessage]:
+        """Return a copy of the persisted message history."""
+
+    def add_turn(self, session_id: str, user_msg: str, assistant_msg: str) -> None:
+        """Append a full user+assistant turn."""
+
+    def clear(self, session_id: str) -> None:
+        """Delete all history for a session."""
+
+
+class InMemorySessionStore:
+    """Process-local session store for development and fallback use."""
+
+    backend_name = "memory"
 
     def __init__(self, max_history: int = 20) -> None:
-        self._sessions: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+        self._sessions: Dict[str, List[ChatMessage]] = defaultdict(list)
         self.max_history = max_history
 
     def get_or_create(self, session_id: str | None) -> str:
-        """Returns the given session_id, or creates a fresh UUID if None."""
         return session_id if session_id else str(uuid.uuid4())
 
-    def get_history(self, session_id: str) -> List[Dict[str, str]]:
-        """Returns a copy of the message history for the session."""
+    def get_history(self, session_id: str) -> List[ChatMessage]:
         return list(self._sessions[session_id])
 
     def add_turn(self, session_id: str, user_msg: str, assistant_msg: str) -> None:
-        """Appends a user+assistant turn and trims to max_history."""
         buf = self._sessions[session_id]
         buf.append({"role": "user", "content": user_msg})
         buf.append({"role": "assistant", "content": assistant_msg})

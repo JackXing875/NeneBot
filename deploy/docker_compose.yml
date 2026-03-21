@@ -1,0 +1,30 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    env_file:
+      - ../.env
+    environment:
+      SESSION_BACKEND: redis
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+    ports:
+      - "8000:8000"
+    volumes:
+      - vector_store:/app/vector_store
+      - huggingface_cache:/home/appuser/.cache/huggingface
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  redis_data:
+  vector_store:
+  huggingface_cache:

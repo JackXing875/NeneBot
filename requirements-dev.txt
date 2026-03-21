@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=8.3.0
+fakeredis>=2.31.0
+ruff>=0.12.0

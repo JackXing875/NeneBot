@@ -183,6 +183,32 @@ python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 * `http://localhost:8000` → 完整应用
 * `http://localhost:8000/docs` → API 文档
 
+### Docker Compose 本地部署（app + Redis）
+
+如果你希望在本地以更接近生产环境的方式运行，并启用持久化会话存储：
+
+```bash
+cp .env.example .env
+docker compose -f deploy/docker_compose.yml up --build
+```
+
+该方案会启动：
+
+* `app`：`http://localhost:8000`
+* `redis`：`localhost:6379`
+
+建议在 `.env` 中设置：
+
+```env
+SESSION_BACKEND=redis
+REDIS_URL=redis://redis:6379/0
+```
+
+运维排查入口：
+
+* `GET /health`：查看服务、向量索引、前端模式、会话后端状态
+* 响应头 `X-Request-ID`：用于把客户端报错与服务端日志串起来
+
 ---
 
 ## 项目架构 
@@ -217,6 +243,8 @@ NeneBot/
 * **修改立绘与背景**：替换 `frontend/public/` 目录下的 `nene_sprite.png` 和 `bg_room.png`，无需重启即可生效（Vite 热更新支持）。
 * **修改角色设定**：编辑 `src/services/rag_pipeline.py` 中的 `_CHARACTER_CARD` 常量，增加新的性格设定指令。
 * **重建记忆库**：如果你替换了 `data/raw/train.jsonl`，请运行 `python scripts/init_vector_db.py` 重新生成 `vector_store/`。
+* **持久化会话**：设置 `SESSION_BACKEND=redis` 并配置 `REDIS_URL`，即可在重启后保留聊天记忆。
+* **运维排障**：通过 `/health` 查看组件状态，通过 `X-Request-ID` 关联客户端请求与服务端日志。
 
 ---
 

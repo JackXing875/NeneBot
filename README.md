@@ -197,6 +197,32 @@ Then open:
 * `http://localhost:8000` → Full application
 * `http://localhost:8000/docs` → API docs
 
+### Option D — Docker Compose (app + Redis)
+
+For a more production-like local stack with persistent session storage:
+
+```bash
+cp .env.example .env
+docker compose -f deploy/docker_compose.yml up --build
+```
+
+This stack starts:
+
+* `app` on `http://localhost:8000`
+* `redis` on `localhost:6379`
+
+Recommended `.env` settings for this mode:
+
+```env
+SESSION_BACKEND=redis
+REDIS_URL=redis://redis:6379/0
+```
+
+Operational endpoints:
+
+* `GET /health` → service health, vector index status, frontend mode, session backend status
+* Response header `X-Request-ID` → request correlation id for logs and API debugging
+
 ---
 
 ## Architecture
@@ -231,6 +257,8 @@ For developers who want to tweak the bot, you can easily customize Nene:
 * **Change Sprites & Backgrounds**: Replace `nene_sprite.png` and `bg_room.png` in the `frontend/public/` directory. Changes apply instantly in dev thanks to Vite HMR.
 * **Modify Character Persona**: Edit the `_CHARACTER_CARD` constant in `src/services/rag_pipeline.py` to add new personality traits or instructions.
 * **Rebuild the Memory Index**: If you replace `data/raw/train.jsonl`, run `python scripts/init_vector_db.py` to regenerate `vector_store/`.
+* **Session Persistence**: Set `SESSION_BACKEND=redis` and configure `REDIS_URL` to persist chat memory across restarts.
+* **Operations**: Use `/health` for diagnostics and `X-Request-ID` to correlate client failures with server logs.
 
 ---
 

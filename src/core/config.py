@@ -61,6 +61,9 @@ class Settings(BaseSettings):
 
     # --- Session Memory ---
     session_max_history: int = 20  # Max messages (user+assistant) kept per session
+    session_backend: str = "memory"  # "memory" | "redis"
+    redis_url: str = "redis://127.0.0.1:6379/0"
+    session_ttl_seconds: int = 86400
 
     class Config:
         env_file = ".env"

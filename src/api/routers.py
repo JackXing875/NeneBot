@@ -76,7 +76,12 @@ async def chat_stream_endpoint(
     async def event_stream() -> AsyncGenerator[str, None]:
         collected: list[str] = []
         try:
-            yield f"data: {json.dumps({'type': 'meta', 'session_id': session_id, 'references': refs_payload})}\n\n"
+            meta_event = {
+                "type": "meta",
+                "session_id": session_id,
+                "references": refs_payload,
+            }
+            yield f"data: {json.dumps(meta_event)}\n\n"
 
             async for chunk in llm.chat_stream(messages):
                 collected.append(chunk)
@@ -84,7 +89,11 @@ async def chat_stream_endpoint(
 
         except Exception as e:
             logger.error(f"event_stream error: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'message': '（宁宁的思绪突然断开了……）'})}\n\n"
+            error_event = {
+                "type": "error",
+                "message": "（宁宁的思绪突然断开了……）",
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
         else:
             # Only persist the turn when no exception occurred
             sessions.add_turn(session_id, request.query, "".join(collected))

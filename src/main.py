@@ -1,23 +1,32 @@
 """FastAPI application entry point with lifespan service initialization."""
-
-import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from src.api.routers import chat_router
 from src.core.config import settings
+from src.core.exceptions import NeneBotError
+from src.core.http import (
+    RequestContextMiddleware,
+    http_exception_handler,
+    nenebot_exception_handler,
+    unhandled_exception_handler,
+    validation_exception_handler,
+)
 from src.core.logger import setup_logger
+from src.core.observability import build_health_payload
 from src.infrastructure.llm_base import BaseLLMClient
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
 from src.services.embedding_svc import EmbeddingService
 from src.services.rag_pipeline import RAGPipeline
-from src.services.session_store import SessionStore
+from src.services.session_store import InMemorySessionStore, SessionStore
+from src.services.session_store_redis import RedisSessionStore
 
 logger = setup_logger()
 
@@ -38,6 +47,40 @@ def _create_llm_client() -> BaseLLMClient:
     # Default: Ollama (local)
     from src.infrastructure.llm_client import OllamaClient
     return OllamaClient()
+
+
+def _create_session_store() -> SessionStore:
+    """Create the configured session backend with a safe in-memory fallback."""
+    backend = settings.session_backend.lower()
+    if backend == "redis":
+        try:
+            store = RedisSessionStore(
+                redis_url=settings.redis_url,
+                max_history=settings.session_max_history,
+                ttl_seconds=settings.session_ttl_seconds,
+            )
+            # Fail fast on invalid connection details; fallback to memory in local dev.
+            store.client.ping()
+            logger.info("Session backend: redis")
+            return store
+        except Exception as exc:
+            logger.warning(f"Redis session store unavailable, falling back to memory: {exc}")
+
+    logger.info("Session backend: memory")
+    return InMemorySessionStore(max_history=settings.session_max_history)
+
+
+def _check_session_backend(store: SessionStore) -> tuple[bool, str | None]:
+    """Return backend health for the session store."""
+    if getattr(store, "backend_name", "memory") != "redis":
+        return True, None
+
+    try:
+        if isinstance(store, RedisSessionStore):
+            store.ping()
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
 
 
 def _ensure_index_exists() -> None:
@@ -73,7 +116,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         embedding_svc=app.state.embedding_svc,
     )
     app.state.llm_client = _create_llm_client()
-    app.state.session_store = SessionStore(max_history=settings.session_max_history)
+    app.state.session_store = _create_session_store()
 
     logger.info("All services ready.")
     yield
@@ -94,6 +137,12 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestContextMiddleware)
+
+    app.add_exception_handler(HTTPException, http_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(NeneBotError, nenebot_exception_handler)
+    app.add_exception_handler(Exception, unhandled_exception_handler)
 
     # API routes
     app.include_router(chat_router)
@@ -101,18 +150,16 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["Ops"])
     async def health_check() -> dict[str, object]:
         vs: FaissVectorStore = app.state.vector_store
-        return {
-            "status": "ok",
-            "llm_provider": settings.llm_provider,
-            "llm_model": (
-                settings.claude_model_name
-                if settings.llm_provider == "claude"
-                else settings.openai_compat_model
-                if settings.llm_provider in ("deepseek", "openai")
-                else settings.llm_model_name
-            ),
-            "index_vectors": vs.index.ntotal,
-        }
+        session_store: SessionStore = app.state.session_store
+        frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+        session_ok, session_error = _check_session_backend(session_store)
+        return build_health_payload(
+            vector_store=vs,
+            frontend_dist_exists=frontend_dist.exists(),
+            session_backend_name=getattr(session_store, "backend_name", "unknown"),
+            session_backend_ok=session_ok,
+            session_backend_error=session_error,
+        )
 
     # Serve compiled Vue frontend if the dist directory exists.
     # In production (Railway), the build step creates frontend/dist before uvicorn starts.
