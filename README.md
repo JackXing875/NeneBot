@@ -11,7 +11,7 @@
  <div>&nbsp;</div>
 
 <p align="center">
-  <b>A RAG-Powered Conversational AI for Ayachi Nene — runs locally or on any cloud LLM</b><br>
+  <b>A RAG-Powered Conversational AI for Ayachi Nene </b><br>
   <i>"メンカタカラメヤサイダブルニンニクアブラマシマシ！"</i>
 </p>
 
