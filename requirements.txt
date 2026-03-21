@@ -21,3 +21,4 @@ numpy>=1.26.0
 tqdm>=4.66.0
 python-dotenv>=1.0.0
 mypy
+pytest>=8.3.0
