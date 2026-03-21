@@ -1,0 +1,23 @@
+src/core/observability.py
+  7d2bd2c22c7628fb 6,20,87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "9d7f00790b63128b7d812c1a7caafb81259fdc8a",
+  "prompts": {
+    "7d2bd2c22c7628fb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d0f4b-14ab-7762-9a1c-84abbdbd235f",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Schrieffer <xjack875@gmail.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
