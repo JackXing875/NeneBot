@@ -1,0 +1,25 @@
+requirements-dev.txt
+  7d2bd2c22c7628fb 4
+.github/workflows/ci.yml
+  7d2bd2c22c7628fb 28-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "f52583f3f74a4c4818647d607f21dce9132986de",
+  "prompts": {
+    "7d2bd2c22c7628fb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d0f4b-14ab-7762-9a1c-84abbdbd235f",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Schrieffer <xjack875@gmail.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 1,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}
