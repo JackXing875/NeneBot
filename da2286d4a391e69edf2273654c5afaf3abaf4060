@@ -1,0 +1,51 @@
+src/api/routers.py
+  08095cff7cbc4d31 12,24-26,51-53,55,60,87-90
+src/infrastructure/llm_client.py
+  08095cff7cbc4d31 5,26,52
+src/infrastructure/llm_openai_compat.py
+  08095cff7cbc4d31 4,7,35,38,45
+scripts/run.sh
+  08095cff7cbc4d31 10-15,18-29,34-36,38,61-65,67
+src/main.py
+  08095cff7cbc4d31 102
+src/services/rag_pipeline.py
+  08095cff7cbc4d31 4,55,73-74,110-111
+src/infrastructure/llm_claude.py
+  08095cff7cbc4d31 4,7,29,42,46
+pyproject.toml
+  08095cff7cbc4d31 27
+railway.toml
+  08095cff7cbc4d31 14
+src/core/logger.py
+  08095cff7cbc4d31 7
+src/services/embedding_svc.py
+  08095cff7cbc4d31 63-64
+src/api/dependencies.py
+  08095cff7cbc4d31 3-4,7,13,16-17,21
+src/infrastructure/llm_base.py
+  08095cff7cbc4d31 4,17
+scripts/setup.sh
+  08095cff7cbc4d31 24-29,32,34-39,43-44,46-50,52-57,66
+deploy/Dockerfile
+  08095cff7cbc4d31 2,4,6-17,35,37,43,46,48-52,60-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "da2286d4a391e69edf2273654c5afaf3abaf4060",
+  "prompts": {
+    "08095cff7cbc4d31": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bff18799-970d-4c23-b7d8-7c01c3861c7a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Schrieffer <xjack875@gmail.com>",
+      "messages": [],
+      "total_additions": 175,
+      "total_deletions": 142,
+      "accepted_lines": 131,
+      "overriden_lines": 0
+    }
+  }
+}
