@@ -30,8 +30,20 @@ class JsonFormatter(logging.Formatter):
             "path",
             "status_code",
             "duration_ms",
+            "mode",
+            "provider_name",
+            "model_name",
             "session_backend",
             "llm_provider",
+            "query_length",
+            "top_k",
+            "retrieved_count",
+            "filtered_count",
+            "match_threshold",
+            "prompt_messages",
+            "chunk_count",
+            "output_chars",
+            "ready",
         ):
             value = getattr(record, field, None)
             if value is not None:
@@ -59,11 +71,13 @@ def build_health_payload(
         if settings.llm_provider in ("deepseek", "openai")
         else settings.llm_model_name
     )
-    vector_index_exists = Path(settings.vector_index_path).exists()
-    knowledge_meta_exists = Path(settings.knowledge_meta_path).exists()
+    vector_index_exists = Path(vector_store.index_path).exists()
+    knowledge_meta_exists = Path(vector_store.meta_path).exists()
+    ready = session_backend_ok and vector_index_exists and knowledge_meta_exists
 
     payload: dict[str, object] = {
-        "status": "ok" if session_backend_ok else "degraded",
+        "status": "ok" if ready else "degraded",
+        "ready": ready,
         "service": "nenebot",
         "llm_provider": settings.llm_provider,
         "llm_model": llm_model,
@@ -75,9 +89,9 @@ def build_health_payload(
         "vector_store": {
             "status": "ok" if vector_index_exists and knowledge_meta_exists else "missing",
             "index_vectors": vector_store.index.ntotal,
-            "index_path": settings.vector_index_path,
+            "index_path": vector_store.index_path,
             "index_exists": vector_index_exists,
-            "metadata_path": settings.knowledge_meta_path,
+            "metadata_path": vector_store.meta_path,
             "metadata_exists": knowledge_meta_exists,
         },
         "frontend": {
@@ -93,6 +107,15 @@ def build_health_payload(
             session_backend["error"] = session_backend_error
 
     return payload
+
+
+def build_liveness_payload() -> dict[str, object]:
+    """Build a lightweight liveness payload for process health checks."""
+    return {
+        "status": "ok",
+        "service": "nenebot",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 def now_ms() -> float:

@@ -1,10 +1,11 @@
 import asyncio
+from pathlib import Path
 
 from fastapi import Response
 from starlette.requests import Request
 
 from src.core.http import RequestContextMiddleware
-from src.core.observability import build_health_payload
+from src.core.observability import build_health_payload, build_liveness_payload
 
 
 def test_build_health_payload_reports_backend_and_vector_state(fake_vector_store) -> None:
@@ -15,10 +16,34 @@ def test_build_health_payload_reports_backend_and_vector_state(fake_vector_store
         session_backend_ok=True,
     )
 
-    assert payload["status"] == "ok"
+    assert payload["status"] == "degraded"
+    assert payload["ready"] is False
     assert payload["session_backend"]["name"] == "memory"
     assert payload["vector_store"]["index_vectors"] == 0
     assert payload["frontend"]["status"] == "dev-mode"
+
+
+def test_build_health_payload_reports_ready_when_index_files_exist(fake_vector_store) -> None:
+    Path(fake_vector_store.index_path).write_bytes(b"")
+    Path(fake_vector_store.meta_path).write_text("{}", encoding="utf-8")
+
+    payload = build_health_payload(
+        vector_store=fake_vector_store,
+        frontend_dist_exists=True,
+        session_backend_name="redis",
+        session_backend_ok=True,
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["ready"] is True
+    assert payload["frontend"]["status"] == "ok"
+
+
+def test_build_liveness_payload_is_always_ok() -> None:
+    payload = build_liveness_payload()
+
+    assert payload["status"] == "ok"
+    assert payload["service"] == "nenebot"
 
 
 def test_request_context_middleware_sets_request_id_header() -> None:

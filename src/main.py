@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api.routers import chat_router
@@ -20,7 +21,7 @@ from src.core.http import (
     validation_exception_handler,
 )
 from src.core.logger import setup_logger
-from src.core.observability import build_health_payload
+from src.core.observability import build_health_payload, build_liveness_payload
 from src.infrastructure.llm_base import BaseLLMClient
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
 from src.services.embedding_svc import EmbeddingService
@@ -160,6 +161,16 @@ def create_app() -> FastAPI:
             session_backend_ok=session_ok,
             session_backend_error=session_error,
         )
+
+    @app.get("/health/live", tags=["Ops"])
+    async def liveness_check() -> dict[str, object]:
+        return build_liveness_payload()
+
+    @app.get("/health/ready", tags=["Ops"])
+    async def readiness_check() -> JSONResponse:
+        payload = await health_check()
+        status_code = 200 if bool(payload.get("ready")) else 503
+        return JSONResponse(status_code=status_code, content=payload)
 
     # Serve compiled Vue frontend if the dist directory exists.
     # In production (Railway), the build step creates frontend/dist before uvicorn starts.

@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 class OllamaClient(BaseLLMClient):
     """Async client for Ollama's /api/chat endpoint (local development)."""
 
+    provider_name = "ollama"
+
     def __init__(self) -> None:
         self.chat_endpoint = f"{settings.ollama_base_url}/api/chat"
         self.model_name = settings.llm_model_name

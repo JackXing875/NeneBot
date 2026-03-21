@@ -4,6 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.core.config import settings
+from src.core.observability import now_ms
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
 from src.services.embedding_svc import EmbeddingService
 
@@ -54,12 +55,21 @@ class RAGPipeline:
 
     def retrieve_and_filter(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """Embed query, search FAISS, keep results above cosine threshold."""
+        started_at = now_ms()
         query_embedding = self.embedding_svc.encode([query])[0]
         raw = self.vector_store.search(query_embedding, top_k=top_k)
         filtered = [r for r in raw if r.get("similarity_score", 0.0) >= self.match_threshold]
         logger.info(
-            f"RAG retrieved {len(raw)} results, {len(filtered)} passed "
-            f"threshold={self.match_threshold}"
+            "rag_retrieval_completed",
+            extra={
+                "event": "rag_retrieval_completed",
+                "query_length": len(query),
+                "top_k": top_k,
+                "retrieved_count": len(raw),
+                "filtered_count": len(filtered),
+                "match_threshold": self.match_threshold,
+                "duration_ms": round(now_ms() - started_at, 2),
+            },
         )
         return filtered
 

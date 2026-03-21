@@ -19,6 +19,8 @@ class OpenAICompatClient(BaseLLMClient):
     Switch providers by changing OPENAI_COMPAT_BASE_URL and OPENAI_COMPAT_API_KEY.
     """
 
+    provider_name = "openai_compat"
+
     def __init__(self) -> None:
         self._client = AsyncOpenAI(
             api_key=settings.openai_compat_api_key,

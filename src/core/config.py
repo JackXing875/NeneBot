@@ -16,13 +16,18 @@ Set the LLM_PROVIDER environment variable to switch backends:
 from pathlib import Path
 from typing import Optional
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables or defaults."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
     # --- API ---
     api_title: str = "NeneBot API"
@@ -64,10 +69,5 @@ class Settings(BaseSettings):
     session_backend: str = "memory"  # "memory" | "redis"
     redis_url: str = "redis://127.0.0.1:6379/0"
     session_ttl_seconds: int = 86400
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-
 
 settings = Settings()

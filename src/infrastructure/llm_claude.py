@@ -19,6 +19,8 @@ class ClaudeClient(BaseLLMClient):
     extract it here before forwarding to the API.
     """
 
+    provider_name = "claude"
+
     def __init__(self) -> None:
         self._client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
         self.model = settings.claude_model_name
