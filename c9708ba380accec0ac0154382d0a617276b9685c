@@ -1,0 +1,23 @@
+.github/workflows/ci.yml
+  7d2bd2c22c7628fb 32-33,37,40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "c9708ba380accec0ac0154382d0a617276b9685c",
+  "prompts": {
+    "7d2bd2c22c7628fb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d0f4b-14ab-7762-9a1c-84abbdbd235f",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Schrieffer <xjack875@gmail.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 3,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
