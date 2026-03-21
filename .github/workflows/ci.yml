@@ -28,12 +28,13 @@ jobs:
       - name: Debug CI Context
         run: |
           git rev-parse HEAD
-          ruff --version
           python --version
+          python -m pip show ruff
+          python -m ruff --version
           sed -n '1,12p' tests/conftest.py
 
       - name: Ruff
-        run: ruff check src tests
+        run: python -m ruff check src tests
 
       - name: Pytest
-        run: pytest
+        run: python -m pytest
