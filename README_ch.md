@@ -79,6 +79,39 @@
 
 请根据你的操作系统选择相应的步骤：
 
+在本地运行之前，请先决定你要使用哪一种 **LLM 后端**：
+
+* **本地 Ollama**：零 API 成本、完全本地化，适合离线或隐私优先场景。
+* **云端 API（Claude / DeepSeek / OpenAI-Compatible）**：回答质量通常更高，也更适合低配机器。
+
+首次运行前，建议先创建 `.env`：
+
+```bash
+cp .env.example .env
+```
+
+然后只填写你所选后端对应的配置：
+
+```env
+# 方案一：本地 Ollama
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+LLM_MODEL_NAME=qwen2.5
+
+# 方案二：DeepSeek
+# LLM_PROVIDER=deepseek
+# OPENAI_COMPAT_API_KEY=sk-...
+# OPENAI_COMPAT_BASE_URL=https://api.deepseek.com
+# OPENAI_COMPAT_MODEL=deepseek-chat
+
+# 方案三：Claude
+# LLM_PROVIDER=claude
+# ANTHROPIC_API_KEY=sk-ant-...
+# CLAUDE_MODEL_NAME=claude-haiku-4-5-20251001
+```
+
+> **补充说明：** 仓库中已经包含 `data/raw/train.jsonl` 以及预构建好的 `vector_store/`。在全新环境中，如果索引缺失，`scripts/setup.sh` 也会自动重新构建。
+
 ### Windows 用户
 
 **第一步：安装两大基础软件（如果你的电脑已有，可跳过）**
@@ -88,6 +121,9 @@
 
 **第二步：下载 NeneBot 源码**
 在 GitHub 页面点击绿色的 `Code` 按钮，选择 `Download ZIP`。解压到你的电脑中（建议路径全英文，如 `D:\NeneBot`）。
+
+**第二点五步：配置模型来源**
+将 `.env.example` 复制为 `.env`。如果你使用云端 API，请先把对应 Key 填好再启动。
 
 **第三步：双击运行！**
 进入解压后的文件夹，找到并**双击运行 `start_windows.bat`**。
@@ -102,20 +138,50 @@
 
 ```bash
 # 1. 克隆代码库并进入目录
-git clone [https://github.com/your-username/NeneBot.git](https://github.com/your-username/NeneBot.git)
+git clone https://github.com/your-username/NeneBot.git
 cd NeneBot
 
-# 2. 赋予脚本执行权限
+# 2. 创建本地环境变量文件
+cp .env.example .env
+
+# 3. 赋予脚本执行权限
 chmod +x scripts/setup.sh scripts/run.sh
 
-# 3. 执行全自动装配 (仅首次需要)
+# 4. 执行全自动装配 (仅首次需要)
 ./scripts/setup.sh
 
-# 4. 运行
+# 5. 运行
 ./scripts/run.sh
 ```
 
 > **Tip:** 服务启动后，浏览器访问 `http://localhost:5173` 即可进入交互界面。后端 API 文档位于 `http://localhost:8000/docs`。
+>
+> **重要：** 不要直接双击打开 `frontend/index.html`。这个项目不是纯静态网页，聊天功能依赖 FastAPI 后端的 `/v1/*` 接口；应通过 `5173` 开发服务器访问，或先构建前端后由 FastAPI 统一托管。
+
+### 单端口本地运行（更接近生产部署）
+
+如果你希望只通过 **一个地址** 访问完整页面，而不是分别启动前端开发服务器：
+
+```bash
+# 1. 后端环境
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 2. 构建前端
+cd frontend
+npm install
+npm run build
+cd ..
+
+# 3. 由 FastAPI 同时提供 API 和前端页面
+python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
+```
+
+然后访问：
+
+* `http://localhost:8000` → 完整应用
+* `http://localhost:8000/docs` → API 文档
 
 ---
 
@@ -146,10 +212,11 @@ NeneBot/
 
 对于有开发能力的玩家，你可以通过修改以下文件来“调教”属于你的宁宁：
 
-* **切换 LLM**：在 `.env` 中设置 `LLM_PROVIDER=claude / deepseek / ollama`，并填入对应的 API Key，详见 `.env.example`。
+* **切换 LLM**：在 `.env` 中设置 `LLM_PROVIDER=claude / deepseek / ollama / openai`，并填入对应的 API Key，详见 `.env.example`。
 * **修改严格程度**：调整 `MATCH_THRESHOLD`（默认 `0.55`），值越小回答越贴合剧本，值越大越自由发挥。
-* **修改立绘与背景**：替换 `frontend/public/` 目录下的 `nene_sprite.png` 和 `bg_room.jpg`，无需重启即可生效（Vite 热更新支持）。
+* **修改立绘与背景**：替换 `frontend/public/` 目录下的 `nene_sprite.png` 和 `bg_room.png`，无需重启即可生效（Vite 热更新支持）。
 * **修改角色设定**：编辑 `src/services/rag_pipeline.py` 中的 `_CHARACTER_CARD` 常量，增加新的性格设定指令。
+* **重建记忆库**：如果你替换了 `data/raw/train.jsonl`，请运行 `python scripts/init_vector_db.py` 重新生成 `vector_store/`。
 
 ---
 
@@ -165,13 +232,30 @@ NeneBot/
 <details>
 <summary><b>2. 出现"宁宁的思绪断开了"错误提示？</b></summary>
 
+请先确认后端服务本身是否已经正常启动：
+
+* 前端开发页面：`http://localhost:5173`
+* 后端健康检查：`http://localhost:8000/health`
+* 后端文档：`http://localhost:8000/docs`
+
 **使用本地 Ollama 时**：Ollama 服务未启动，或内存/显存不足。尝试手动运行 `ollama run qwen2.5`。WSL/Linux 用户还需确认系统代理没有拦截本地请求（`unset http_proxy`）。
 
 **使用云端 API 时**：检查 `.env` 中的 `ANTHROPIC_API_KEY` 或 `OPENAI_COMPAT_API_KEY` 是否正确，以及 `LLM_PROVIDER` 是否与所用 Key 匹配。
 </details>
 
 <details>
-<summary><b>3. 我想换成其他角色（比如三司绫濑）可以吗？</b></summary>
+<summary><b>3. 可以不启动服务，直接双击页面文件使用吗？</b></summary>
+
+不可以。这个项目不是一个纯静态 HTML 页面。
+
+Vue 前端依赖 FastAPI 提供的 `/v1/chat/stream`、会话记忆和 RAG 检索能力，因此应使用以下两种方式之一：
+
+1. **开发模式**：运行 `./scripts/run.sh`，访问 `http://localhost:5173`
+2. **单端口模式**：构建 `frontend/dist` 后启动 FastAPI，访问 `http://localhost:8000`
+</details>
+
+<details>
+<summary><b>4. 我想换成其他角色（比如三司绫濑）可以吗？</b></summary>
 
 
 

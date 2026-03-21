@@ -93,6 +93,39 @@ Deploy to [Railway](https://railway.app) in under 5 minutes. Users only need a b
 
 ### Option B — Local Setup
 
+Before starting locally, decide **which LLM backend** you want to use:
+
+* **Local Ollama**: zero API cost, fully local, recommended for offline/private use.
+* **Cloud API (Claude / DeepSeek / OpenAI-compatible)**: better quality and easier setup on lower-end machines.
+
+Create a local `.env` file before your first run:
+
+```bash
+cp .env.example .env
+```
+
+Then edit only the fields relevant to your provider:
+
+```env
+# Option 1: Local Ollama
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+LLM_MODEL_NAME=qwen2.5
+
+# Option 2: DeepSeek
+# LLM_PROVIDER=deepseek
+# OPENAI_COMPAT_API_KEY=sk-...
+# OPENAI_COMPAT_BASE_URL=https://api.deepseek.com
+# OPENAI_COMPAT_MODEL=deepseek-chat
+
+# Option 3: Claude
+# LLM_PROVIDER=claude
+# ANTHROPIC_API_KEY=sk-ant-...
+# CLAUDE_MODEL_NAME=claude-haiku-4-5-20251001
+```
+
+> **Good to know:** This repo already includes `data/raw/train.jsonl` and a prebuilt `vector_store/` directory. On a fresh machine, `scripts/setup.sh` will also rebuild the FAISS index if needed.
+
 ### For Windows Users
 
 **Step 1: Install Prerequisites (Skip if already installed)**
@@ -102,6 +135,9 @@ Deploy to [Railway](https://railway.app) in under 5 minutes. Users only need a b
 
 **Step 2: Download NeneBot**
 Click the green `Code` button on this GitHub page and select `Download ZIP`. Extract it to a folder on your PC (e.g., `D:\NeneBot`).
+
+**Step 2.5: Configure your provider**
+Copy `.env.example` to `.env`, then fill in the keys only if you are using a cloud provider.
 
 **Step 3: One-Click Ignition!**
 Open the extracted folder and **double-click `start_windows.bat`**.
@@ -116,20 +152,50 @@ Open your terminal and execute the following elegant commands:
 
 ```bash
 # 1. Clone the repository
-git clone [https://github.com/your-username/NeneBot.git](https://github.com/your-username/NeneBot.git)
+git clone https://github.com/your-username/NeneBot.git
 cd NeneBot
 
-# 2. Grant execution permissions to scripts
+# 2. Create your local environment file
+cp .env.example .env
+
+# 3. Grant execution permissions to scripts
 chmod +x scripts/setup.sh scripts/run.sh
 
-# 3. Run the automated setup (Only required once)
+# 4. Run the automated setup (Only required once)
 ./scripts/setup.sh
 
-# 4. Ignite the engines!
+# 5. Ignite the engines!
 ./scripts/run.sh
 ```
 
 > **Tip:** Once started, visit `http://localhost:5173` in your browser for the UI. The backend API Swagger docs are located at `http://localhost:8000/docs`.
+>
+> **Important:** Do **not** open `frontend/index.html` directly in the browser. The application requires a running FastAPI backend (`/v1/*`) and should be accessed through the Vite dev server (`5173`) or the compiled production build served by FastAPI.
+
+### Option C — Single-Port Local Run (production-like)
+
+If you want to access the full app from **one URL only** instead of running Vite separately:
+
+```bash
+# 1. Backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Frontend build
+cd frontend
+npm install
+npm run build
+cd ..
+
+# 3. Serve both API and frontend from FastAPI
+python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
+```
+
+Then open:
+
+* `http://localhost:8000` → Full application
+* `http://localhost:8000/docs` → API docs
 
 ---
 
@@ -160,10 +226,11 @@ NeneBot/
 
 For developers who want to tweak the bot, you can easily customize Nene:
 
-* **Switch LLM Provider**: Set `LLM_PROVIDER` in `.env` to `ollama`, `claude`, or `deepseek`. See `.env.example` for the full list of required keys.
+* **Switch LLM Provider**: Set `LLM_PROVIDER` in `.env` to `ollama`, `claude`, `deepseek`, or `openai`. See `.env.example` for the full list of required keys.
 * **Adjust Strictness**: Modify `MATCH_THRESHOLD` (default `0.55`) in `.env` or directly in `src/services/rag_pipeline.py`. Lower values make her stick strictly to the script; higher values allow more creative freedom.
-* **Change Sprites & Backgrounds**: Replace `nene_sprite.png` and `bg_room.jpg` in the `frontend/public/` directory. Changes apply instantly in dev thanks to Vite HMR.
+* **Change Sprites & Backgrounds**: Replace `nene_sprite.png` and `bg_room.png` in the `frontend/public/` directory. Changes apply instantly in dev thanks to Vite HMR.
 * **Modify Character Persona**: Edit the `_CHARACTER_CARD` constant in `src/services/rag_pipeline.py` to add new personality traits or instructions.
+* **Rebuild the Memory Index**: If you replace `data/raw/train.jsonl`, run `python scripts/init_vector_db.py` to regenerate `vector_store/`.
 
 ---
 
@@ -182,13 +249,30 @@ You either haven't installed Python/Node.js, or forgot to add them to your envir
 <details>
 <summary><b>2. The chat shows a connection error or "Nene's thoughts disconnected"?</b></summary>
 
+First verify that the backend is actually running:
+
+* Frontend dev mode: open `http://localhost:5173`
+* Backend health check: open `http://localhost:8000/health`
+* API docs: open `http://localhost:8000/docs`
+
 **If using Ollama:** The Ollama service may not be running, or your machine ran out of VRAM/RAM. Try running `ollama run qwen2.5` manually. On Linux/WSL, also ensure no system proxy is intercepting localhost traffic (`unset http_proxy`).
 
 **If using a cloud API:** Verify that your `ANTHROPIC_API_KEY` or `OPENAI_COMPAT_API_KEY` is set correctly in `.env` and that `LLM_PROVIDER` matches.
 </details>
 
 <details>
-<summary><b>3. Can I swap the character to someone else (e.g., Ayase Mitsukasa)?</b></summary>
+<summary><b>3. Can I open the page directly without starting anything?</b></summary>
+
+No. This is not a static HTML demo.
+
+The Vue page depends on the FastAPI backend for `/v1/chat/stream`, session memory, and RAG retrieval. Use one of these two modes instead:
+
+1. **Development mode**: `./scripts/run.sh` then open `http://localhost:5173`
+2. **Single-port mode**: build `frontend/dist`, start FastAPI, then open `http://localhost:8000`
+</details>
+
+<details>
+<summary><b>4. Can I swap the character to someone else (e.g., Ayase Mitsukasa)?</b></summary>
 
 
 
@@ -222,4 +306,3 @@ We welcome contributions from the community! Whether it's fixing bugs, improving
 
 Distributed under the **[GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0)**.
 This project is for technical exploration and learning purposes only. The copyright of the character sprites, background art, and game scripts belongs to the original creator (Yuzusoft). Please do not use them for commercial purposes.
-
