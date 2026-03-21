@@ -25,6 +25,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      - name: Debug CI Context
+        run: |
+          git rev-parse HEAD
+          ruff --version
+          python --version
+          sed -n '1,12p' tests/conftest.py
+
       - name: Ruff
         run: ruff check src tests
 
