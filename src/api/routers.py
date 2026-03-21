@@ -11,6 +11,7 @@ from src.api.dependencies import get_llm_client, get_rag_pipeline, get_session_s
 from src.api.schemas import ChatRequest, ChatResponse, ReferenceMeta
 from src.core.observability import now_ms
 from src.infrastructure.llm_base import BaseLLMClient
+from src.services.chat_orchestrator import generate_chat_turn
 from src.services.rag_pipeline import RAGPipeline
 from src.services.session_store import SessionStore
 
@@ -27,12 +28,15 @@ async def chat_endpoint(
     sessions: SessionStore = Depends(get_session_store),  # noqa: B008
 ) -> ChatResponse:
     """Non-streaming chat – waits for the full reply before responding."""
-    session_id = sessions.get_or_create(request.session_id)
-    history = sessions.get_history(session_id)
-
-    messages, contexts = rag.process_query(request.query, request.top_k, history)
     started_at = now_ms()
-    reply = await llm.chat(messages)
+    result = await generate_chat_turn(
+        query=request.query,
+        session_id=request.session_id,
+        top_k=request.top_k,
+        rag=rag,
+        llm=llm,
+        sessions=sessions,
+    )
     logger.info(
         "llm_completion_completed",
         extra={
@@ -40,13 +44,11 @@ async def chat_endpoint(
             "mode": "non_stream",
             "provider_name": getattr(llm, "provider_name", llm.__class__.__name__),
             "model_name": getattr(llm, "model_name", getattr(llm, "model", None)),
-            "prompt_messages": len(messages),
-            "output_chars": len(reply),
+            "prompt_messages": len(result.messages),
+            "output_chars": len(result.reply),
             "duration_ms": round(now_ms() - started_at, 2),
         },
     )
-
-    sessions.add_turn(session_id, request.query, reply)
 
     refs = [
         ReferenceMeta(
@@ -54,9 +56,9 @@ async def chat_endpoint(
             bot_response=c.get("bot_response", ""),
             similarity_score=c.get("similarity_score", 0.0),
         )
-        for c in contexts
+        for c in result.contexts
     ]
-    return ChatResponse(reply=reply, session_id=session_id, references=refs)
+    return ChatResponse(reply=result.reply, session_id=result.session_id, references=refs)
 
 
 @chat_router.post("/chat/stream")

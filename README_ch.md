@@ -209,6 +209,30 @@ REDIS_URL=redis://redis:6379/0
 * `GET /health`：查看服务、向量索引、前端模式、会话后端状态
 * 响应头 `X-Request-ID`：用于把客户端报错与服务端日志串起来
 
+### Telegram Bot 接入（长轮询）
+
+如果你想先接入一个最简单的 IM 平台，推荐先用 Telegram 官方 Bot API。
+
+1. 通过 `@BotFather` 创建机器人
+2. 将 token 写入 `.env`
+3. 启动长轮询适配器：
+
+```bash
+cp .env.example .env
+
+# 至少填写：
+# TELEGRAM_BOT_TOKEN=123456:ABC...
+# LLM_PROVIDER=deepseek   # 或 ollama / claude / openai
+
+python -m src.adapters.telegram
+```
+
+说明：
+
+* Telegram 聊天会映射到内部会话 id，例如 `telegram:<chat_id>`
+* 发送 `/reset` 可以清空该聊天窗口的记忆
+* 当前采用长轮询方式接入，因此暂时 **不需要** 公网 webhook 地址
+
 ---
 
 ## 项目架构 
@@ -245,6 +269,7 @@ NeneBot/
 * **重建记忆库**：如果你替换了 `data/raw/train.jsonl`，请运行 `python scripts/init_vector_db.py` 重新生成 `vector_store/`。
 * **持久化会话**：设置 `SESSION_BACKEND=redis` 并配置 `REDIS_URL`，即可在重启后保留聊天记忆。
 * **运维排障**：通过 `/health` 查看组件状态，通过 `X-Request-ID` 关联客户端请求与服务端日志。
+* **Telegram 适配器**：设置 `TELEGRAM_BOT_TOKEN` 后运行 `python -m src.adapters.telegram`，即可通过长轮询方式接入 Telegram。
 
 ---
 

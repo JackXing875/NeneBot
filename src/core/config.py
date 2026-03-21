@@ -70,4 +70,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://127.0.0.1:6379/0"
     session_ttl_seconds: int = 86400
 
+    # --- Telegram Adapter ---
+    telegram_bot_token: Optional[str] = None
+    telegram_poll_timeout: int = 30
+    telegram_top_k: int = 3
+
 settings = Settings()

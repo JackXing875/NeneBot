@@ -223,6 +223,30 @@ Operational endpoints:
 * `GET /health` → service health, vector index status, frontend mode, session backend status
 * Response header `X-Request-ID` → request correlation id for logs and API debugging
 
+### Option E — Telegram Bot (long polling)
+
+The simplest IM integration path is Telegram via the official Bot API.
+
+1. Create a bot with `@BotFather`
+2. Copy the token into `.env`
+3. Start the polling adapter:
+
+```bash
+cp .env.example .env
+
+# Fill in:
+# TELEGRAM_BOT_TOKEN=123456:ABC...
+# LLM_PROVIDER=deepseek   # or ollama / claude / openai
+
+python -m src.adapters.telegram
+```
+
+Notes:
+
+* Telegram messages are mapped to internal session ids like `telegram:<chat_id>`
+* `/reset` clears that chat's memory window
+* This adapter uses long polling first, so you do **not** need a public webhook URL yet
+
 ---
 
 ## Architecture
@@ -259,6 +283,7 @@ For developers who want to tweak the bot, you can easily customize Nene:
 * **Rebuild the Memory Index**: If you replace `data/raw/train.jsonl`, run `python scripts/init_vector_db.py` to regenerate `vector_store/`.
 * **Session Persistence**: Set `SESSION_BACKEND=redis` and configure `REDIS_URL` to persist chat memory across restarts.
 * **Operations**: Use `/health` for diagnostics and `X-Request-ID` to correlate client failures with server logs.
+* **Telegram Adapter**: Set `TELEGRAM_BOT_TOKEN` and run `python -m src.adapters.telegram` to attach the bot to Telegram via long polling.
 
 ---
 
