@@ -1,0 +1,39 @@
+.env.example
+  7d2bd2c22c7628fb 37-45
+src/services/session_store.py
+  7d2bd2c22c7628fb 1,5,7,10-11,13-31,34,40
+deploy/docker_compose.yml
+  7d2bd2c22c7628fb 1-30
+src/api/routers.py
+  7d2bd2c22c7628fb 79-84,92-96
+requirements-dev.txt
+  7d2bd2c22c7628fb 1-4
+src/main.py
+  7d2bd2c22c7628fb 7-8,14-21,23,28-29,52-70,73-85,119,140-145,153-162
+src/services/session_store_redis.py
+  7d2bd2c22c7628fb 1-66
+requirements.txt
+  7d2bd2c22c7628fb 12
+src/core/config.py
+  7d2bd2c22c7628fb 64-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "c3165f78fa207ddc40ffe854e77d9923e2597b32",
+  "prompts": {
+    "7d2bd2c22c7628fb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d0f4b-14ab-7762-9a1c-84abbdbd235f",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Schrieffer <xjack875@gmail.com>",
+      "messages": [],
+      "total_additions": 215,
+      "total_deletions": 32,
+      "accepted_lines": 215,
+      "overriden_lines": 0
+    }
+  }
+}
