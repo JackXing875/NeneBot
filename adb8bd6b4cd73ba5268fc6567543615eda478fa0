@@ -1,0 +1,25 @@
+README.md
+  7d2bd2c22c7628fb 96-128,139-141,155,158-159,161,164,167,172-177,179-198,229,231,233,252-256,264,266,268,270-275
+README_ch.md
+  7d2bd2c22c7628fb 82-114,125-127,141,144-145,147,150,153,158-163,165-184,215,217,219,235,237-240,247-254,258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "adb8bd6b4cd73ba5268fc6567543615eda478fa0",
+  "prompts": {
+    "7d2bd2c22c7628fb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d0f4b-14ab-7762-9a1c-84abbdbd235f",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Schrieffer <xjack875@gmail.com>",
+      "messages": [],
+      "total_additions": 182,
+      "total_deletions": 15,
+      "accepted_lines": 182,
+      "overriden_lines": 0
+    }
+  }
+}
