@@ -1,0 +1,41 @@
+src/infrastructure/llm_openai_compat.py
+  7d2bd2c22c7628fb 22-23
+src/main.py
+  7d2bd2c22c7628fb 10,24,165-173
+src/api/routers.py
+  7d2bd2c22c7628fb 12,34,36-47,92-93,103,109-121,130-142
+src/infrastructure/llm_claude.py
+  7d2bd2c22c7628fb 22-23
+src/services/rag_pipeline.py
+  7d2bd2c22c7628fb 7,58,63-72
+tests/test_config.py
+  7d2bd2c22c7628fb 10-14
+src/infrastructure/llm_client.py
+  7d2bd2c22c7628fb 18-19
+tests/test_observability.py
+  7d2bd2c22c7628fb 2,8,19-20,26-46
+src/core/config.py
+  7d2bd2c22c7628fb 19,27-31
+src/core/observability.py
+  7d2bd2c22c7628fb 33-35,38-46,74-76,79-80,92,94,112-118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "f3c6ab55195a62d63f9eb0bc3b094276016afdf1",
+  "prompts": {
+    "7d2bd2c22c7628fb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019d0f4b-14ab-7762-9a1c-84abbdbd235f",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Schrieffer <xjack875@gmail.com>",
+      "messages": [],
+      "total_additions": 139,
+      "total_deletions": 16,
+      "accepted_lines": 139,
+      "overriden_lines": 0
+    }
+  }
+}
