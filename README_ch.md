@@ -207,7 +207,23 @@ REDIS_URL=redis://redis:6379/0
 运维排查入口：
 
 * `GET /health`：查看服务、向量索引、前端模式、会话后端状态
+* `GET /health/live` / `GET /health/ready`：分别用于存活探针与就绪探针
+* `GET /metrics`：导出 Prometheus 风格指标文本
 * 响应头 `X-Request-ID`：用于把客户端报错与服务端日志串起来
+
+可选的 API 保护配置：
+
+```env
+API_AUTH_ENABLED=true
+API_AUTH_TOKENS=dev-token-1,dev-token-2
+```
+
+开启后，`/v1/*`、`/health*`、`/metrics` 这些接口需要带上以下任一请求头：
+
+* `Authorization: Bearer <token>`
+* `X-API-Key: <token>`
+
+同时服务日志会输出结构化审计字段，例如 `action`、`endpoint`、`session_id`、`auth_subject`、`request_id`，便于排查调用链路。
 
 ### Telegram Bot 接入（长轮询）
 
@@ -230,8 +246,25 @@ python -m src.adapters.telegram
 说明：
 
 * Telegram 聊天会映射到内部会话 id，例如 `telegram:<chat_id>`
+* 内置命令：`/start`、`/help`、`/reset`、`/model`
 * 发送 `/reset` 可以清空该聊天窗口的记忆
-* 当前采用长轮询方式接入，因此暂时 **不需要** 公网 webhook 地址
+* 默认采用长轮询方式接入，因此暂时 **不需要** 公网 webhook 地址
+
+如果后续要切换到 webhook 模式，可在 `.env` 中配置：
+
+```env
+TELEGRAM_MODE=webhook
+TELEGRAM_PUBLIC_BASE_URL=https://your-domain.com
+TELEGRAM_WEBHOOK_PATH=/integrations/telegram/webhook
+TELEGRAM_WEBHOOK_SECRET=your-secret
+```
+
+然后启动正常的 API 服务即可。Telegram 会把更新推送到：
+
+* `POST /integrations/telegram/webhook`
+
+如果设置了 `TELEGRAM_WEBHOOK_SECRET`，服务端会校验
+`X-Telegram-Bot-Api-Secret-Token` 请求头。
 
 ---
 

@@ -4,6 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.core.config import settings
+from src.core.metrics import rag_retrieval_duration_ms, rag_retrieval_total
 from src.core.observability import now_ms
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
 from src.services.embedding_svc import EmbeddingService
@@ -59,6 +60,9 @@ class RAGPipeline:
         query_embedding = self.embedding_svc.encode([query])[0]
         raw = self.vector_store.search(query_embedding, top_k=top_k)
         filtered = [r for r in raw if r.get("similarity_score", 0.0) >= self.match_threshold]
+        duration_ms = round(now_ms() - started_at, 2)
+        rag_retrieval_total.inc(top_k=str(top_k))
+        rag_retrieval_duration_ms.observe(duration_ms, top_k=str(top_k))
         logger.info(
             "rag_retrieval_completed",
             extra={
@@ -68,7 +72,7 @@ class RAGPipeline:
                 "retrieved_count": len(raw),
                 "filtered_count": len(filtered),
                 "match_threshold": self.match_threshold,
-                "duration_ms": round(now_ms() - started_at, 2),
+                "duration_ms": duration_ms,
             },
         )
         return filtered

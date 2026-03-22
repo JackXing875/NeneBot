@@ -1,4 +1,4 @@
-from src.core.config import Settings
+from src.core.config import Settings, resolve_env_files
 
 
 def test_settings_load_session_defaults() -> None:
@@ -10,5 +10,15 @@ def test_settings_load_session_defaults() -> None:
 
 
 def test_settings_model_config_uses_env_file_defaults() -> None:
-    assert Settings.model_config["env_file"] == ".env"
+    assert Settings.model_config["env_file"] == (".env", ".env.dev")
     assert Settings.model_config["env_file_encoding"] == "utf-8"
+
+
+def test_resolve_env_files_defaults_to_dev(monkeypatch) -> None:
+    monkeypatch.delenv("APP_ENV", raising=False)
+    assert resolve_env_files() == (".env", ".env.dev")
+
+
+def test_resolve_env_files_uses_selected_env(monkeypatch) -> None:
+    monkeypatch.setenv("APP_ENV", "prod")
+    assert resolve_env_files() == (".env", ".env.prod")

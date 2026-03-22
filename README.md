@@ -221,7 +221,23 @@ REDIS_URL=redis://redis:6379/0
 Operational endpoints:
 
 * `GET /health` → service health, vector index status, frontend mode, session backend status
+* `GET /health/live` / `GET /health/ready` → split liveness/readiness probes
+* `GET /metrics` → Prometheus-style metrics text
 * Response header `X-Request-ID` → request correlation id for logs and API debugging
+
+Optional API protection:
+
+```env
+API_AUTH_ENABLED=true
+API_AUTH_TOKENS=dev-token-1,dev-token-2
+```
+
+When enabled, requests to `/v1/*`, `/health*`, and `/metrics` must include either:
+
+* `Authorization: Bearer <token>`
+* `X-API-Key: <token>`
+
+Server logs also emit JSON audit fields such as `action`, `endpoint`, `session_id`, `auth_subject`, and `request_id`.
 
 ### Option E — Telegram Bot (long polling)
 
@@ -244,8 +260,25 @@ python -m src.adapters.telegram
 Notes:
 
 * Telegram messages are mapped to internal session ids like `telegram:<chat_id>`
+* Built-in commands: `/start`, `/help`, `/reset`, `/model`
 * `/reset` clears that chat's memory window
-* This adapter uses long polling first, so you do **not** need a public webhook URL yet
+* Default mode is long polling, so you do **not** need a public webhook URL yet
+
+To switch to webhook mode later:
+
+```env
+TELEGRAM_MODE=webhook
+TELEGRAM_PUBLIC_BASE_URL=https://your-domain.com
+TELEGRAM_WEBHOOK_PATH=/integrations/telegram/webhook
+TELEGRAM_WEBHOOK_SECRET=your-secret
+```
+
+Then start the normal API server. Telegram will POST updates to:
+
+* `POST /integrations/telegram/webhook`
+
+If `TELEGRAM_WEBHOOK_SECRET` is set, the server verifies the
+`X-Telegram-Bot-Api-Secret-Token` header.
 
 ---
 

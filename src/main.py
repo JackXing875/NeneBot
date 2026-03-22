@@ -4,13 +4,20 @@ from pathlib import Path
 from typing import AsyncGenerator
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
+from src.adapters.telegram import (
+    TelegramBotAPI,
+    TelegramBotRunner,
+    configure_telegram_delivery,
+    validate_telegram_webhook_secret,
+)
 from src.api.routers import chat_router
+from src.core.auth import require_api_auth
 from src.core.config import settings
 from src.core.exceptions import NeneBotError
 from src.core.http import (
@@ -21,7 +28,9 @@ from src.core.http import (
     validation_exception_handler,
 )
 from src.core.logger import setup_logger
+from src.core.metrics import registry
 from src.core.observability import build_health_payload, build_liveness_payload
+from src.core.rate_limit import RateLimitMiddleware, build_default_rate_limiter
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
 from src.runtime import RuntimeServices, build_runtime_services, check_session_backend
 from src.services.session_store import SessionStore
@@ -39,6 +48,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.rag_pipeline = services.rag_pipeline
     app.state.llm_client = services.llm_client
     app.state.session_store = services.session_store
+    app.state.telegram_runner = None
+
+    if settings.telegram_bot_token:
+        telegram_api = TelegramBotAPI(settings.telegram_bot_token)
+        telegram_runner = TelegramBotRunner(api=telegram_api, services=services)
+        app.state.telegram_runner = telegram_runner
+        if settings.telegram_mode.lower() == "webhook":
+            await configure_telegram_delivery(telegram_api)
 
     logger.info("All services ready.")
     yield
@@ -60,6 +77,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(RateLimitMiddleware, limiter=build_default_rate_limiter())
 
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
@@ -70,7 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(chat_router)
 
     @app.get("/health", tags=["Ops"])
-    async def health_check() -> dict[str, object]:
+    async def health_check(_: None = Depends(require_api_auth)) -> dict[str, object]:
         vs: FaissVectorStore = app.state.vector_store
         session_store: SessionStore = app.state.session_store
         frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
@@ -84,7 +102,7 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/health/live", tags=["Ops"])
-    async def liveness_check() -> dict[str, object]:
+    async def liveness_check(_: None = Depends(require_api_auth)) -> dict[str, object]:
         return build_liveness_payload()
 
     @app.get("/health/ready", tags=["Ops"])
@@ -92,6 +110,26 @@ def create_app() -> FastAPI:
         payload = await health_check()
         status_code = 200 if bool(payload.get("ready")) else 503
         return JSONResponse(status_code=status_code, content=payload)
+
+    @app.get("/metrics", tags=["Ops"])
+    async def metrics(_: None = Depends(require_api_auth)) -> PlainTextResponse:
+        if not settings.metrics_enabled:
+            raise HTTPException(status_code=404, detail="Metrics endpoint disabled.")
+        return PlainTextResponse(registry.render(), media_type="text/plain; version=0.0.4")
+
+    @app.post(settings.telegram_webhook_path, include_in_schema=False)
+    async def telegram_webhook(
+        update: dict[str, object],
+        x_telegram_bot_api_secret_token: str | None = Header(default=None),
+    ) -> dict[str, bool]:
+        validate_telegram_webhook_secret(x_telegram_bot_api_secret_token)
+
+        runner: TelegramBotRunner | None = app.state.telegram_runner
+        if runner is None:
+            raise HTTPException(status_code=503, detail="Telegram adapter is not configured.")
+
+        await runner.handle_update(update)
+        return {"ok": True}
 
     # Serve compiled Vue frontend if the dist directory exists.
     # In production (Railway), the build step creates frontend/dist before uvicorn starts.

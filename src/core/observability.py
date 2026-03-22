@@ -44,6 +44,11 @@ class JsonFormatter(logging.Formatter):
             "chunk_count",
             "output_chars",
             "ready",
+            "action",
+            "endpoint",
+            "auth_subject",
+            "client_ip",
+            "session_id",
         ):
             value = getattr(record, field, None)
             if value is not None:

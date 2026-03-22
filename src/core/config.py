@@ -13,6 +13,7 @@ Set the LLM_PROVIDER environment variable to switch backends:
     LLM_PROVIDER=openai    → Any OpenAI-compatible endpoint
 """
 
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -21,13 +22,21 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
+def resolve_env_files() -> tuple[str, ...]:
+    """Return layered env files based on APP_ENV."""
+    app_env = os.getenv("APP_ENV", "dev").strip().lower() or "dev"
+    return (".env", f".env.{app_env}")
+
+
 class Settings(BaseSettings):
     """Application settings loaded from environment variables or defaults."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=resolve_env_files(),
         env_file_encoding="utf-8",
     )
+
+    app_env: str = "dev"  # dev | staging | prod
 
     # --- API ---
     api_title: str = "NeneBot API"
@@ -70,9 +79,23 @@ class Settings(BaseSettings):
     redis_url: str = "redis://127.0.0.1:6379/0"
     session_ttl_seconds: int = 86400
 
+    # --- Reliability / Limits ---
+    api_rate_limit_count: int = 20
+    api_rate_limit_window_seconds: int = 60
+    api_auth_enabled: bool = False
+    api_auth_tokens: str = ""
+    api_auth_header_name: str = "Authorization"
+    llm_timeout_seconds: float = 120.0
+    llm_max_retries: int = 2
+    metrics_enabled: bool = True
+
     # --- Telegram Adapter ---
     telegram_bot_token: Optional[str] = None
+    telegram_mode: str = "polling"  # "polling" | "webhook"
     telegram_poll_timeout: int = 30
     telegram_top_k: int = 3
+    telegram_webhook_path: str = "/integrations/telegram/webhook"
+    telegram_webhook_secret: Optional[str] = None
+    telegram_public_base_url: Optional[str] = None
 
 settings = Settings()

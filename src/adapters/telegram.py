@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from fastapi import HTTPException
 
 from src.core.config import settings
 from src.core.logger import setup_logger
@@ -59,6 +60,20 @@ class TelegramBotAPI:
             response = await client.post(f"{self.base_url}/sendMessage", json=payload)
             response.raise_for_status()
 
+    async def set_webhook(self, url: str, secret_token: str | None = None) -> None:
+        payload: dict[str, Any] = {"url": url}
+        if secret_token:
+            payload["secret_token"] = secret_token
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(f"{self.base_url}/setWebhook", json=payload)
+            response.raise_for_status()
+
+    async def delete_webhook(self) -> None:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(f"{self.base_url}/deleteWebhook", json={})
+            response.raise_for_status()
+
 
 class TelegramBotRunner:
     """Poll Telegram updates and route text messages to the chat core."""
@@ -74,11 +89,11 @@ class TelegramBotRunner:
             return False
 
         started_at = now_ms()
-        if message.text == "/reset":
-            self.services.session_store.clear(message.session_id)
+        command_reply = self._handle_command(message)
+        if command_reply is not None:
             await self.api.send_message(
                 message.chat_id,
-                "对话记忆已经清空了，我们重新开始吧……",
+                command_reply,
                 reply_to_message_id=message.message_id,
             )
             logger.info(
@@ -89,7 +104,7 @@ class TelegramBotRunner:
                     "provider_name": "telegram",
                     "query_length": len(message.text),
                     "duration_ms": round(now_ms() - started_at, 2),
-                    "output_chars": 19,
+                    "output_chars": len(command_reply),
                 },
             )
             return True
@@ -161,6 +176,74 @@ class TelegramBotRunner:
             session_id=f"telegram:{chat_id}",
         )
 
+    def _handle_command(self, message: TelegramMessage) -> str | None:
+        if not message.text.startswith("/"):
+            return None
+
+        command = message.text.split()[0].split("@")[0].lower()
+
+        if command == "/start":
+            return (
+                "你好呀，我是宁宁。\n"
+                "直接和我聊天就可以了。\n"
+                "可用命令：/help /reset /model"
+            )
+        if command == "/help":
+            return (
+                "使用说明：\n"
+                "1. 直接发送文字开始聊天\n"
+                "2. /reset 清空当前会话记忆\n"
+                "3. /model 查看当前模型后端"
+            )
+        if command == "/reset":
+            self.services.session_store.clear(message.session_id)
+            return "对话记忆已经清空了，我们重新开始吧……"
+        if command == "/model":
+            llm = self.services.llm_client
+            provider = getattr(llm, "provider_name", llm.__class__.__name__)
+            model = getattr(llm, "model_name", getattr(llm, "model", "unknown"))
+            return f"当前模型后端：{provider}\n当前模型：{model}"
+
+        return "暂时不支持这个命令，发送 /help 可以查看可用命令。"
+
+
+def validate_telegram_webhook_secret(header_secret: str | None) -> None:
+    """Validate Telegram's webhook secret token header when configured."""
+    expected = settings.telegram_webhook_secret
+    if not expected:
+        return
+    if header_secret != expected:
+        raise HTTPException(status_code=403, detail="Invalid Telegram webhook secret.")
+
+
+async def configure_telegram_delivery(api: TelegramBotAPI) -> None:
+    """Configure Telegram delivery mode based on settings."""
+    mode = settings.telegram_mode.lower()
+    if mode == "webhook":
+        if not settings.telegram_public_base_url:
+            raise RuntimeError("TELEGRAM_PUBLIC_BASE_URL is required when TELEGRAM_MODE=webhook.")
+        webhook_url = (
+            settings.telegram_public_base_url.rstrip("/") + settings.telegram_webhook_path
+        )
+        await api.set_webhook(webhook_url, settings.telegram_webhook_secret)
+        logger.info(
+            "telegram_delivery_configured",
+            extra={
+                "event": "telegram_delivery_configured",
+                "mode": "telegram_webhook",
+            },
+        )
+        return
+
+    await api.delete_webhook()
+    logger.info(
+        "telegram_delivery_configured",
+        extra={
+            "event": "telegram_delivery_configured",
+            "mode": "telegram_polling",
+        },
+    )
+
 
 async def main() -> None:
     """CLI entrypoint for the Telegram polling bot."""
@@ -169,6 +252,7 @@ async def main() -> None:
 
     services = build_runtime_services()
     api = TelegramBotAPI(settings.telegram_bot_token)
+    await configure_telegram_delivery(api)
     runner = TelegramBotRunner(api=api, services=services)
     await runner.run_forever()
 

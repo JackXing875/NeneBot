@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.core.exceptions import NeneBotError
+from src.core.metrics import http_request_duration_ms, http_requests_total
 from src.core.request_context import get_request_id, reset_request_id, set_request_id
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         request.state.request_id = request_id
         token = set_request_id(request_id)
+        client = request.client.host if request.client else None
 
         from src.core.observability import now_ms
 
@@ -49,6 +51,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                     "request_id": request_id,
                     "method": request.method,
                     "path": request.url.path,
+                    "client_ip": client,
                     "duration_ms": duration_ms,
                 },
             )
@@ -56,6 +59,17 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         else:
             duration_ms = round(now_ms() - started_at, 2)
             response.headers["X-Request-ID"] = request_id
+            auth_subject = getattr(request.state, "auth_subject", None)
+            http_requests_total.inc(
+                method=request.method,
+                path=request.url.path,
+                status_code=str(response.status_code),
+            )
+            http_request_duration_ms.observe(
+                duration_ms,
+                method=request.method,
+                path=request.url.path,
+            )
             logger.info(
                 "request_completed",
                 extra={
@@ -64,7 +78,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                     "method": request.method,
                     "path": request.url.path,
                     "status_code": response.status_code,
+                    "client_ip": client,
                     "duration_ms": duration_ms,
+                    "auth_subject": auth_subject,
                 },
             )
             return response

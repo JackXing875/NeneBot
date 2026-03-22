@@ -23,3 +23,31 @@ class VectorStoreError(NeneBotError):
 
 class LLMInferenceError(NeneBotError):
     """Raised when the LLM service (Ollama) returns an error."""
+
+
+class RateLimitExceededError(NeneBotError):
+    """Raised when a caller exceeds the configured request budget."""
+
+    def __init__(self, message: str = "Too many requests.") -> None:
+        super().__init__(message, code="rate_limited", status_code=429)
+
+
+class AuthenticationError(NeneBotError):
+    """Raised when a protected API is accessed without valid credentials."""
+
+    def __init__(self, message: str = "Valid API token required.") -> None:
+        super().__init__(message, code="auth_required", status_code=401)
+
+
+class LLMTimeoutError(LLMInferenceError):
+    """Raised when the provider does not answer in time."""
+
+    def __init__(self, message: str = "LLM provider timed out.") -> None:
+        super().__init__(message, code="llm_timeout", status_code=504)
+
+
+class LLMProviderUnavailableError(LLMInferenceError):
+    """Raised when the provider fails after retries are exhausted."""
+
+    def __init__(self, message: str = "LLM provider unavailable.") -> None:
+        super().__init__(message, code="llm_unavailable", status_code=503)

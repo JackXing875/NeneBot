@@ -8,6 +8,7 @@ from openai.types.chat import ChatCompletionMessageParam
 
 from src.core.config import settings
 from src.infrastructure.llm_base import BaseLLMClient
+from src.infrastructure.llm_resilience import resilient_stream
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +36,22 @@ class OpenAICompatClient(BaseLLMClient):
     async def chat_stream(
         self, messages: List[Dict[str, str]]
     ) -> AsyncIterator[str]:
-        stream = await self._client.chat.completions.create(
-            model=self.model,
-            messages=cast(List[ChatCompletionMessageParam], messages),
-            stream=True,
-            temperature=0.7,
-            max_tokens=512,
-        )
-        async for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+        async def stream_factory() -> AsyncIterator[str]:
+            stream = await self._client.chat.completions.create(
+                model=self.model,
+                messages=cast(List[ChatCompletionMessageParam], messages),
+                stream=True,
+                temperature=0.7,
+                max_tokens=512,
+                timeout=settings.llm_timeout_seconds,
+            )
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+        async for chunk in resilient_stream(
+            stream_factory,
+            provider_name=self.provider_name,
+            model_name=self.model,
+        ):
+            yield chunk

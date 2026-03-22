@@ -8,6 +8,7 @@ import httpx
 
 from src.core.config import settings
 from src.infrastructure.llm_base import BaseLLMClient
+from src.infrastructure.llm_resilience import resilient_stream
 
 logger = logging.getLogger(__name__)
 
@@ -27,28 +28,39 @@ class OllamaClient(BaseLLMClient):
         self, messages: List[Dict[str, str]]
     ) -> AsyncIterator[str]:
         """Yields response content chunks from Ollama's streaming API."""
-        payload = {
-            "model": self.model_name,
-            "messages": messages,
-            "stream": True,
-            "options": self._options,
-        }
-        # trust_env=False prevents httpx from picking up http_proxy / HTTP_PROXY
-        # env vars, which would route localhost Ollama requests through a proxy
-        # and cause 502 Bad Gateway errors.
-        async with httpx.AsyncClient(trust_env=False) as client:
-            async with client.stream(
-                "POST", self.chat_endpoint, json=payload, timeout=120.0
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line:
-                        continue
-                    try:
-                        data = json.loads(line)
-                        if not data.get("done"):
-                            content = data.get("message", {}).get("content", "")
-                            if content:
-                                yield content
-                    except json.JSONDecodeError:
-                        continue
+        async def stream_factory() -> AsyncIterator[str]:
+            payload = {
+                "model": self.model_name,
+                "messages": messages,
+                "stream": True,
+                "options": self._options,
+            }
+            # trust_env=False prevents httpx from picking up http_proxy / HTTP_PROXY
+            # env vars, which would route localhost Ollama requests through a proxy
+            # and cause 502 Bad Gateway errors.
+            async with httpx.AsyncClient(trust_env=False) as client:
+                async with client.stream(
+                    "POST",
+                    self.chat_endpoint,
+                    json=payload,
+                    timeout=settings.llm_timeout_seconds,
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        try:
+                            data = json.loads(line)
+                            if not data.get("done"):
+                                content = data.get("message", {}).get("content", "")
+                                if content:
+                                    yield content
+                        except json.JSONDecodeError:
+                            continue
+
+        async for chunk in resilient_stream(
+            stream_factory,
+            provider_name=self.provider_name,
+            model_name=self.model_name,
+        ):
+            yield chunk

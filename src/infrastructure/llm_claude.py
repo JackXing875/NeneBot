@@ -8,6 +8,7 @@ from anthropic.types import MessageParam
 
 from src.core.config import settings
 from src.infrastructure.llm_base import BaseLLMClient
+from src.infrastructure.llm_resilience import resilient_stream
 
 logger = logging.getLogger(__name__)
 
@@ -29,20 +30,28 @@ class ClaudeClient(BaseLLMClient):
     async def chat_stream(
         self, messages: List[Dict[str, str]]
     ) -> AsyncIterator[str]:
-        system_content = ""
-        chat_messages: List[Dict[str, str]] = []
-        for msg in messages:
-            if msg["role"] == "system":
-                system_content = msg["content"]
-            else:
-                chat_messages.append(msg)
+        async def stream_factory() -> AsyncIterator[str]:
+            system_content = ""
+            chat_messages: List[Dict[str, str]] = []
+            for msg in messages:
+                if msg["role"] == "system":
+                    system_content = msg["content"]
+                else:
+                    chat_messages.append(msg)
 
-        async with self._client.messages.stream(
-            model=self.model,
-            max_tokens=512,
-            system=system_content,
-            messages=cast(List[MessageParam], chat_messages),
-            temperature=1.0,  # anthropic sdk controls creativity differently
-        ) as stream:
-            async for text in stream.text_stream:
-                yield text
+            async with self._client.messages.stream(
+                model=self.model,
+                max_tokens=512,
+                system=system_content,
+                messages=cast(List[MessageParam], chat_messages),
+                temperature=1.0,  # anthropic sdk controls creativity differently
+            ) as stream:
+                async for text in stream.text_stream:
+                    yield text
+
+        async for chunk in resilient_stream(
+            stream_factory,
+            provider_name=self.provider_name,
+            model_name=self.model,
+        ):
+            yield chunk
