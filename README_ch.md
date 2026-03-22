@@ -311,6 +311,7 @@ TRACING_EXPORTER=console
 
 * 后台现在已经有一个知识库面板，支持：
   * 查看数据集预览
+  * 先做 JSONL 预校验
   * 导入 JSONL 内容
   * 重建向量索引
 * 导入内容必须是 JSONL，每行一个 JSON 对象，并且包含 `messages` 列表。
@@ -322,14 +323,17 @@ TRACING_EXPORTER=console
    ```json
    {"messages":[{"role":"system","content":"You are Nene."},{"role":"user","content":"你好"},{"role":"assistant","content":"你好呀，保科君。"}]}
    ```
-3. 点击 `IMPORT + REBUILD`。
-4. 确认页面发生变化：
+3. 先点击 `VALIDATE`，确认 dry-run 校验通过。
+4. 再点击 `IMPORT + REBUILD`。
+5. 确认页面发生变化：
    * dataset line count 更新
    * preview 出现刚导入的 user / assistant 内容
    * vector store 摘要刷新
-5. 再发送一次正常聊天请求，确认服务仍能正常回答。
+6. 再发送一次正常聊天请求，确认服务仍能正常回答。
 
 如果数据集摘要刷新成功，且索引重建没有报错，就说明这条知识库运维链路已经接通。
+
+发布前请对照 [RELEASE_CHECKLIST.md](/home/schrieffer/NeneBot/RELEASE_CHECKLIST.md) 做一次完整检查。
 
 ### Telegram Bot 接入（长轮询）
 

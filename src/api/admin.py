@@ -34,11 +34,16 @@ class KnowledgeImportRequest(BaseModel):
         True,
         description="Whether to rebuild the vector index immediately after import.",
     )
+    dry_run: bool = Field(
+        False,
+        description="Validate dataset content without writing it to disk.",
+    )
 
 
 class KnowledgeActionResponse(BaseModel):
     dataset: dict[str, Any]
     vector_store: dict[str, Any] | None = None
+    dry_run: bool = False
 
 
 def _session_summary(session_store: SessionStore) -> dict[str, object]:
@@ -190,15 +195,22 @@ async def admin_knowledge_import(
         action="knowledge_import",
         endpoint="/admin/api/knowledge/import",
         rebuild_requested=payload.rebuild,
+        dry_run=payload.dry_run,
         dataset_path=settings.data_path,
     )
     try:
-        dataset_summary = write_jsonl_dataset(payload.content, settings.data_path)
+        if payload.dry_run:
+            from src.services.knowledge_base_admin import validate_jsonl_content
+
+            validate_jsonl_content(payload.content)
+            dataset_summary = summarize_dataset(settings.data_path)
+        else:
+            dataset_summary = write_jsonl_dataset(payload.content, settings.data_path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     vector_summary: dict[str, Any] | None = None
-    if payload.rebuild:
+    if payload.rebuild and not payload.dry_run:
         try:
             rebuild_knowledge_base()
             vector_summary = _refresh_vector_store(request)
@@ -208,4 +220,8 @@ async def admin_knowledge_import(
                 detail=f"Dataset saved but rebuild failed: {exc}",
             ) from exc
 
-    return KnowledgeActionResponse(dataset=dataset_summary, vector_store=vector_summary)
+    return KnowledgeActionResponse(
+        dataset=dataset_summary,
+        vector_store=vector_summary,
+        dry_run=payload.dry_run,
+    )

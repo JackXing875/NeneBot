@@ -213,7 +213,7 @@
           <p class="text-xs uppercase tracking-[0.4em] text-slate-400">Knowledge Operations</p>
           <h2 class="mt-2 text-xl font-semibold text-white">Import And Rebuild</h2>
           <p class="mt-2 text-sm leading-7 text-slate-400">
-            这里先做后台 MVP 最关键的两个动作：上传新的 JSONL 数据集，以及触发向量索引重建。
+            这里做的是发布前可用的最小知识库运维：预校验 JSONL、导入数据集、重建向量索引。
           </p>
 
           <div v-if="knowledgeError" class="mt-5 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
@@ -233,6 +233,13 @@
           ></textarea>
 
           <div class="mt-5 flex flex-wrap gap-3">
+            <button
+              @click="validateKnowledge"
+              :disabled="isKnowledgeBusy || !knowledgeInput.trim()"
+              class="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-5 py-3 text-xs tracking-[0.25em] text-emerald-100 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              VALIDATE
+            </button>
             <button
               @click="importKnowledge(true)"
               :disabled="isKnowledgeBusy || !knowledgeInput.trim()"
@@ -255,6 +262,9 @@
               REBUILD INDEX
             </button>
           </div>
+          <p v-if="isKnowledgeBusy" class="mt-4 text-xs uppercase tracking-[0.25em] text-amber-200">
+            knowledge operation in progress...
+          </p>
         </article>
       </section>
     </div>
@@ -340,7 +350,7 @@ async function importKnowledge(rebuild) {
         'Content-Type': 'application/json',
         ...getAdminHeaders(),
       },
-      body: JSON.stringify({ content: knowledgeInput.value, rebuild }),
+      body: JSON.stringify({ content: knowledgeInput.value, rebuild, dry_run: false }),
     })
     const payload = await response.json()
     if (!response.ok) {
@@ -354,6 +364,32 @@ async function importKnowledge(rebuild) {
   } catch (err) {
     console.error(err)
     knowledgeError.value = `导入失败：${err.message || err}`
+  } finally {
+    isKnowledgeBusy.value = false
+  }
+}
+
+async function validateKnowledge() {
+  knowledgeError.value = ''
+  knowledgeSuccess.value = ''
+  isKnowledgeBusy.value = true
+  try {
+    const response = await fetch('/admin/api/knowledge/import', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAdminHeaders(),
+      },
+      body: JSON.stringify({ content: knowledgeInput.value, rebuild: false, dry_run: true }),
+    })
+    const payload = await response.json()
+    if (!response.ok) {
+      throw new Error(payload?.detail || `validate HTTP ${response.status}`)
+    }
+    knowledgeSuccess.value = 'JSONL 结构校验通过，尚未写入磁盘。'
+  } catch (err) {
+    console.error(err)
+    knowledgeError.value = `预校验失败：${err.message || err}`
   } finally {
     isKnowledgeBusy.value = false
   }

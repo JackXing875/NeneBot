@@ -325,6 +325,7 @@ Knowledge base operations:
 
 * The admin console now includes a knowledge panel for:
   * viewing dataset preview
+  * validating JSONL before writing
   * importing JSONL content
   * rebuilding the vector index
 * Imported content must be JSONL, one JSON object per line, with a `messages` list.
@@ -336,14 +337,19 @@ How to verify knowledge import and rebuild:
    ```json
    {"messages":[{"role":"system","content":"You are Nene."},{"role":"user","content":"你好"},{"role":"assistant","content":"你好呀，保科君。"}]}
    ```
-3. Click `IMPORT + REBUILD`.
-4. Confirm the page updates:
+3. Click `VALIDATE` first and confirm the dry-run succeeds.
+4. Click `IMPORT + REBUILD`.
+5. Confirm the page updates:
    * dataset line count changes
    * preview shows the imported user/assistant pair
    * vector store summary refreshes
-5. Send a normal chat request and confirm the service still answers normally.
+6. Send a normal chat request and confirm the service still answers normally.
 
 If the dataset summary updates and rebuild completes without error, the knowledge workflow is connected correctly.
+
+Release gate:
+
+* See [RELEASE_CHECKLIST.md](/home/schrieffer/NeneBot/RELEASE_CHECKLIST.md) before tagging a preview release.
 
 ### Option E — Telegram Bot (long polling)
 

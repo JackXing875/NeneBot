@@ -40,7 +40,7 @@ class Settings(BaseSettings):
 
     # --- API ---
     api_title: str = "NeneBot API"
-    api_version: str = "2.0.0"
+    api_version: str = "0.6.0b1"
     host: str = "0.0.0.0"
     port: int = 8000  # Overridden by PORT env var on Railway
 

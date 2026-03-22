@@ -114,6 +114,45 @@ def test_admin_knowledge_import_writes_dataset_without_rebuild(
     assert dataset_path.exists()
 
 
+def test_admin_knowledge_import_supports_dry_run(
+    fake_vector_store,
+    fake_session_store,
+    monkeypatch,
+    tmp_path,
+) -> None:
+    dataset_path = tmp_path / "train.jsonl"
+    dataset_path.write_text(
+        '{"messages":[{"role":"user","content":"旧数据"},{"role":"assistant","content":"旧回复"}]}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(settings, "data_path", str(dataset_path))
+
+    request = SimpleNamespace(
+        app=SimpleNamespace(
+            state=SimpleNamespace(
+                vector_store=fake_vector_store,
+                rag_pipeline=SimpleNamespace(vector_store=fake_vector_store),
+                session_store=fake_session_store,
+            )
+        ),
+        state=SimpleNamespace(auth_subject="ops-dashboard", auth_scopes=["ops"]),
+    )
+
+    payload = asyncio.run(
+        admin_knowledge_import(
+            KnowledgeImportRequest(
+                content='{"messages":[{"role":"user","content":"新数据"},{"role":"assistant","content":"新回复"}]}',
+                rebuild=False,
+                dry_run=True,
+            ),
+            request,
+        )
+    )
+
+    assert payload.dry_run is True
+    assert "旧数据" in dataset_path.read_text(encoding="utf-8")
+
+
 def test_admin_knowledge_rebuild_refreshes_vector_store(
     fake_vector_store,
     fake_session_store,
