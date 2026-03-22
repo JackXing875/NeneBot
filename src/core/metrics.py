@@ -146,3 +146,15 @@ rate_limit_exceeded_total = registry.counter(
     "nenebot_rate_limit_exceeded_total",
     "Total requests rejected by the in-memory rate limiter.",
 )
+auth_failures_total = registry.counter(
+    "nenebot_auth_failures_total",
+    "Total authentication failures grouped by reason.",
+)
+llm_retry_attempts_total = registry.counter(
+    "nenebot_llm_retry_attempts_total",
+    "Total LLM retry attempts grouped by provider and failure type.",
+)
+llm_failures_total = registry.counter(
+    "nenebot_llm_failures_total",
+    "Total LLM failures grouped by provider and terminal error type.",
+)

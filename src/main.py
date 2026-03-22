@@ -7,7 +7,7 @@ import uvicorn
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.adapters.telegram import (
@@ -16,8 +16,9 @@ from src.adapters.telegram import (
     configure_telegram_delivery,
     validate_telegram_webhook_secret,
 )
+from src.api.admin import admin_router
 from src.api.routers import chat_router
-from src.core.auth import require_api_auth
+from src.core.auth import require_api_scope
 from src.core.config import settings
 from src.core.exceptions import NeneBotError
 from src.core.http import (
@@ -86,9 +87,10 @@ def create_app() -> FastAPI:
 
     # API routes
     app.include_router(chat_router)
+    app.include_router(admin_router)
 
     @app.get("/health", tags=["Ops"])
-    async def health_check(_: None = Depends(require_api_auth)) -> dict[str, object]:
+    async def health_check(_: None = Depends(require_api_scope("ops"))) -> dict[str, object]:
         vs: FaissVectorStore = app.state.vector_store
         session_store: SessionStore = app.state.session_store
         frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
@@ -102,7 +104,7 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/health/live", tags=["Ops"])
-    async def liveness_check(_: None = Depends(require_api_auth)) -> dict[str, object]:
+    async def liveness_check(_: None = Depends(require_api_scope("ops"))) -> dict[str, object]:
         return build_liveness_payload()
 
     @app.get("/health/ready", tags=["Ops"])
@@ -112,7 +114,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=status_code, content=payload)
 
     @app.get("/metrics", tags=["Ops"])
-    async def metrics(_: None = Depends(require_api_auth)) -> PlainTextResponse:
+    async def metrics(_: None = Depends(require_api_scope("ops"))) -> PlainTextResponse:
         if not settings.metrics_enabled:
             raise HTTPException(status_code=404, detail="Metrics endpoint disabled.")
         return PlainTextResponse(registry.render(), media_type="text/plain; version=0.0.4")
@@ -135,6 +137,10 @@ def create_app() -> FastAPI:
     # In production (Railway), the build step creates frontend/dist before uvicorn starts.
     frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
     if frontend_dist.exists():
+        @app.get("/admin", include_in_schema=False)
+        async def admin_console(_: None = Depends(require_api_scope("ops"))) -> FileResponse:
+            return FileResponse(frontend_dist / "admin.html")
+
         app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
         logger.info(f"Serving frontend from {frontend_dist}")
     else:

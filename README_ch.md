@@ -181,6 +181,7 @@ python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 然后访问：
 
 * `http://localhost:8000` → 完整应用
+* `http://localhost:8000/admin` → 只读后台控制台
 * `http://localhost:8000/docs` → API 文档
 
 ### Docker Compose 本地部署（app + Redis）
@@ -215,15 +216,120 @@ REDIS_URL=redis://redis:6379/0
 
 ```env
 API_AUTH_ENABLED=true
-API_AUTH_TOKENS=dev-token-1,dev-token-2
+API_AUTH_TOKENS=frontend|chat:dev-chat-token,ops|ops:dev-ops-token
+API_AUTH_REGISTRY_PATH=./config/api_tokens.json
 ```
 
-开启后，`/v1/*`、`/health*`、`/metrics` 这些接口需要带上以下任一请求头：
+开启后，请求需要带上以下任一请求头：
 
 * `Authorization: Bearer <token>`
 * `X-API-Key: <token>`
 
-同时服务日志会输出结构化审计字段，例如 `action`、`endpoint`、`session_id`、`auth_subject`、`request_id`，便于排查调用链路。
+Scope 规则：
+
+* `/v1/*` 需要 `chat`
+* `/health*` 与 `/metrics` 需要 `ops`
+* 没显式声明 scope 的旧 token 仍默认拥有 `chat` + `ops`，以保证兼容
+
+如果不想把 token 直接写进 `.env`，也可以使用本地 registry 文件：
+
+```json
+[
+  { "name": "frontend", "token": "replace-with-chat-token", "scopes": ["chat"] },
+  { "name": "ops-dashboard", "token": "replace-with-ops-token", "scopes": ["ops"] }
+]
+```
+
+完整格式可参考 [config/api_tokens.json.example](/home/schrieffer/NeneBot/config/api_tokens.json.example)。
+
+同时服务日志会输出结构化审计字段，例如 `action`、`endpoint`、`session_id`、`auth_subject`、`auth_scopes`、`request_id`，便于排查调用链路。
+
+可选 tracing 配置：
+
+```env
+TRACING_ENABLED=true
+TRACING_SERVICE_NAME=nenebot
+TRACING_EXPORTER=console
+```
+
+当前会产出的 span：
+
+* `http.request`
+* `rag.retrieve`
+* `llm.request`
+
+如何在本地验证 tracing 是否成功：
+
+1. 先安装最新依赖：
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. 在 `.env` 里开启 tracing：
+   ```env
+   TRACING_ENABLED=true
+   TRACING_EXPORTER=console
+   ```
+3. 启动 API 服务后，实际发送一次聊天请求。
+4. 观察服务端终端输出，应该能看到 span 名称，例如：
+   * `http.request`
+   * `rag.retrieve`
+   * `llm.request`
+5. 再确认 span 属性里带有这些字段：
+   * `request_id`
+   * `http_path`
+   * `provider_name`
+   * `rag.retrieved_count`
+   * 如果启用了 token，还应看到 `auth.subject`
+
+如果接口本身能正常响应，同时终端里出现这些 span 输出，就说明 tracing 接线已经成功。
+
+只读后台 MVP：
+
+* `GET /admin/api/overview`：查看运行状态、健康信息、LLM、检索、鉴权、集成配置摘要
+* `GET /admin/api/metrics/summary`：查看 Prometheus 指标预览
+* `GET /admin/api/knowledge/overview`：查看数据集摘要和向量索引摘要
+* `POST /admin/api/knowledge/import`：导入 JSONL 数据集内容
+* `POST /admin/api/knowledge/rebuild`：基于当前数据集重建向量索引
+* `http://localhost:8000/admin`：浏览器后台控制台
+
+如何验证后台控制台是否正常：
+
+1. 先在 `.env` 或 `config/api_tokens.json` 中配置一个带 `ops` scope 的 token。
+2. 构建前端并启动应用。
+3. 打开 `http://localhost:8000/admin`。
+4. 页面提示时输入这个 `ops` token。
+5. 确认页面能显示：
+   * 服务名 / 环境 / 版本
+   * health 状态
+   * LLM provider / model
+   * 已配置的鉴权身份
+   * metrics 预览内容
+
+如果页面能正常加载，且这些卡片都填充出来，就说明后台 MVP 已经接通。
+
+知识库操作：
+
+* 后台现在已经有一个知识库面板，支持：
+  * 查看数据集预览
+  * 导入 JSONL 内容
+  * 重建向量索引
+* 导入内容必须是 JSONL，每行一个 JSON 对象，并且包含 `messages` 列表。
+
+如何验证知识库导入和重建是否成功：
+
+1. 用一个带 `ops` scope 的 token 打开 `http://localhost:8000/admin`。
+2. 在知识库输入框里粘贴一行合法 JSONL，例如：
+   ```json
+   {"messages":[{"role":"system","content":"You are Nene."},{"role":"user","content":"你好"},{"role":"assistant","content":"你好呀，保科君。"}]}
+   ```
+3. 点击 `IMPORT + REBUILD`。
+4. 确认页面发生变化：
+   * dataset line count 更新
+   * preview 出现刚导入的 user / assistant 内容
+   * vector store 摘要刷新
+5. 再发送一次正常聊天请求，确认服务仍能正常回答。
+
+如果数据集摘要刷新成功，且索引重建没有报错，就说明这条知识库运维链路已经接通。
 
 ### Telegram Bot 接入（长轮询）
 

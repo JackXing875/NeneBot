@@ -84,7 +84,11 @@ class Settings(BaseSettings):
     api_rate_limit_window_seconds: int = 60
     api_auth_enabled: bool = False
     api_auth_tokens: str = ""
+    api_auth_registry_path: str = str(PROJECT_ROOT / "config" / "api_tokens.json")
     api_auth_header_name: str = "Authorization"
+    tracing_enabled: bool = False
+    tracing_service_name: str = "nenebot"
+    tracing_exporter: str = "console"  # console | noop
     llm_timeout_seconds: float = 120.0
     llm_max_retries: int = 2
     metrics_enabled: bool = True

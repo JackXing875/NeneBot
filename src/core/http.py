@@ -12,6 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from src.core.exceptions import NeneBotError
 from src.core.metrics import http_request_duration_ms, http_requests_total
 from src.core.request_context import get_request_id, reset_request_id, set_request_id
+from src.core.tracing import traced_span
 
 logger = logging.getLogger(__name__)
 
@@ -40,52 +41,65 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         from src.core.observability import now_ms
 
         started_at = now_ms()
-        try:
-            response = await call_next(request)
-        except Exception:
-            duration_ms = round(now_ms() - started_at, 2)
-            logger.exception(
-                "request_failed",
-                extra={
-                    "event": "request_failed",
-                    "request_id": request_id,
-                    "method": request.method,
-                    "path": request.url.path,
-                    "client_ip": client,
-                    "duration_ms": duration_ms,
-                },
-            )
-            raise
-        else:
-            duration_ms = round(now_ms() - started_at, 2)
-            response.headers["X-Request-ID"] = request_id
-            auth_subject = getattr(request.state, "auth_subject", None)
-            http_requests_total.inc(
-                method=request.method,
-                path=request.url.path,
-                status_code=str(response.status_code),
-            )
-            http_request_duration_ms.observe(
-                duration_ms,
-                method=request.method,
-                path=request.url.path,
-            )
-            logger.info(
-                "request_completed",
-                extra={
-                    "event": "request_completed",
-                    "request_id": request_id,
-                    "method": request.method,
-                    "path": request.url.path,
-                    "status_code": response.status_code,
-                    "client_ip": client,
-                    "duration_ms": duration_ms,
-                    "auth_subject": auth_subject,
-                },
-            )
-            return response
-        finally:
-            reset_request_id(token)
+        with traced_span(
+            "http.request",
+            http_method=request.method,
+            http_path=request.url.path,
+            client_ip=client,
+        ) as span:
+            try:
+                response = await call_next(request)
+            except Exception:
+                duration_ms = round(now_ms() - started_at, 2)
+                logger.exception(
+                    "request_failed",
+                    extra={
+                        "event": "request_failed",
+                        "request_id": request_id,
+                        "method": request.method,
+                        "path": request.url.path,
+                        "client_ip": client,
+                        "duration_ms": duration_ms,
+                    },
+                )
+                if span is not None:
+                    span.set_attribute("http.status_code", 500)
+                raise
+            else:
+                duration_ms = round(now_ms() - started_at, 2)
+                response.headers["X-Request-ID"] = request_id
+                auth_subject = getattr(request.state, "auth_subject", None)
+                http_requests_total.inc(
+                    method=request.method,
+                    path=request.url.path,
+                    status_code=str(response.status_code),
+                )
+                http_request_duration_ms.observe(
+                    duration_ms,
+                    method=request.method,
+                    path=request.url.path,
+                )
+                logger.info(
+                    "request_completed",
+                    extra={
+                        "event": "request_completed",
+                        "request_id": request_id,
+                        "method": request.method,
+                        "path": request.url.path,
+                        "status_code": response.status_code,
+                        "client_ip": client,
+                        "duration_ms": duration_ms,
+                        "auth_subject": auth_subject,
+                        "auth_token_preview": getattr(request.state, "auth_token_preview", None),
+                        "auth_scopes": getattr(request.state, "auth_scopes", None),
+                    },
+                )
+                if span is not None:
+                    span.set_attribute("http.status_code", response.status_code)
+                    span.set_attribute("auth.subject", auth_subject)
+                return response
+            finally:
+                reset_request_id(token)
 
 
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:

@@ -195,6 +195,7 @@ python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 Then open:
 
 * `http://localhost:8000` → Full application
+* `http://localhost:8000/admin` → Read-only admin console
 * `http://localhost:8000/docs` → API docs
 
 ### Option D — Docker Compose (app + Redis)
@@ -229,15 +230,120 @@ Optional API protection:
 
 ```env
 API_AUTH_ENABLED=true
-API_AUTH_TOKENS=dev-token-1,dev-token-2
+API_AUTH_TOKENS=frontend|chat:dev-chat-token,ops|ops:dev-ops-token
+API_AUTH_REGISTRY_PATH=./config/api_tokens.json
 ```
 
-When enabled, requests to `/v1/*`, `/health*`, and `/metrics` must include either:
+When enabled, requests must include either:
 
 * `Authorization: Bearer <token>`
 * `X-API-Key: <token>`
 
-Server logs also emit JSON audit fields such as `action`, `endpoint`, `session_id`, `auth_subject`, and `request_id`.
+Scope rules:
+
+* `/v1/*` requires `chat`
+* `/health*` and `/metrics` require `ops`
+* Legacy tokens without explicit scopes still get `chat` + `ops` for backward compatibility
+
+You can also move tokens into a local registry file instead of `.env`:
+
+```json
+[
+  { "name": "frontend", "token": "replace-with-chat-token", "scopes": ["chat"] },
+  { "name": "ops-dashboard", "token": "replace-with-ops-token", "scopes": ["ops"] }
+]
+```
+
+See [config/api_tokens.json.example](/home/schrieffer/NeneBot/config/api_tokens.json.example) for the full format.
+
+Server logs also emit JSON audit fields such as `action`, `endpoint`, `session_id`, `auth_subject`, `auth_scopes`, and `request_id`.
+
+Optional tracing:
+
+```env
+TRACING_ENABLED=true
+TRACING_SERVICE_NAME=nenebot
+TRACING_EXPORTER=console
+```
+
+Current spans:
+
+* `http.request`
+* `rag.retrieve`
+* `llm.request`
+
+How to verify tracing works locally:
+
+1. Install updated dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Enable tracing in `.env`:
+   ```env
+   TRACING_ENABLED=true
+   TRACING_EXPORTER=console
+   ```
+3. Start the API server and send one chat request.
+4. Check the server stdout. You should see span output containing names like:
+   * `http.request`
+   * `rag.retrieve`
+   * `llm.request`
+5. Confirm span attributes include fields such as:
+   * `request_id`
+   * `http_path`
+   * `provider_name`
+   * `rag.retrieved_count`
+   * `auth.subject` when a token is used
+
+If you see normal API responses and span dumps in the terminal, tracing is wired correctly.
+
+Read-only admin MVP:
+
+* `GET /admin/api/overview` → runtime, health, LLM, retrieval, auth, integrations summary
+* `GET /admin/api/metrics/summary` → preview of rendered Prometheus metrics
+* `GET /admin/api/knowledge/overview` → dataset summary and vector store summary
+* `POST /admin/api/knowledge/import` → import JSONL dataset content
+* `POST /admin/api/knowledge/rebuild` → rebuild vector index from current dataset
+* `http://localhost:8000/admin` → browser admin console
+
+How to verify the admin console works:
+
+1. Configure an `ops` token in `.env` or `config/api_tokens.json`.
+2. Build the frontend and start the app.
+3. Open `http://localhost:8000/admin`.
+4. When prompted, paste the `ops` token.
+5. Confirm the page shows:
+   * service/environment/version
+   * health status
+   * LLM provider/model
+   * configured auth identities
+   * metrics preview lines
+
+If the page loads and these cards populate, the admin MVP is working.
+
+Knowledge base operations:
+
+* The admin console now includes a knowledge panel for:
+  * viewing dataset preview
+  * importing JSONL content
+  * rebuilding the vector index
+* Imported content must be JSONL, one JSON object per line, with a `messages` list.
+
+How to verify knowledge import and rebuild:
+
+1. Open `http://localhost:8000/admin` with an `ops` token.
+2. Paste one valid JSONL line into the knowledge textarea, for example:
+   ```json
+   {"messages":[{"role":"system","content":"You are Nene."},{"role":"user","content":"你好"},{"role":"assistant","content":"你好呀，保科君。"}]}
+   ```
+3. Click `IMPORT + REBUILD`.
+4. Confirm the page updates:
+   * dataset line count changes
+   * preview shows the imported user/assistant pair
+   * vector store summary refreshes
+5. Send a normal chat request and confirm the service still answers normally.
+
+If the dataset summary updates and rebuild completes without error, the knowledge workflow is connected correctly.
 
 ### Option E — Telegram Bot (long polling)
 

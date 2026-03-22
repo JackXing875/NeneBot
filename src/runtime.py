@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.core.config import settings
 from src.core.logger import setup_logger
+from src.core.tracing import setup_tracing, tracing_available
 from src.infrastructure.llm_base import BaseLLMClient
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
 from src.services.embedding_svc import EmbeddingService
@@ -96,6 +97,10 @@ def ensure_index_exists() -> None:
 
 def build_runtime_services() -> RuntimeServices:
     """Instantiate the core services used by chat endpoints and adapters."""
+    if settings.tracing_enabled:
+        setup_tracing()
+        logger.info(f"Tracing enabled: available={tracing_available()}")
+
     ensure_index_exists()
 
     embedding_svc = EmbeddingService()

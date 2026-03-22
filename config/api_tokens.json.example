@@ -1,0 +1,17 @@
+[
+  {
+    "name": "frontend",
+    "token": "replace-with-chat-token",
+    "scopes": ["chat"]
+  },
+  {
+    "name": "ops-dashboard",
+    "token": "replace-with-ops-token",
+    "scopes": ["ops"]
+  },
+  {
+    "name": "admin-service",
+    "token": "replace-with-admin-token",
+    "scopes": ["chat", "ops"]
+  }
+]

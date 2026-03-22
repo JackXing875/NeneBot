@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from src.core.config import settings
 from src.core.metrics import rag_retrieval_duration_ms, rag_retrieval_total
 from src.core.observability import now_ms
+from src.core.tracing import traced_span
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
 from src.services.embedding_svc import EmbeddingService
 
@@ -56,26 +57,36 @@ class RAGPipeline:
 
     def retrieve_and_filter(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """Embed query, search FAISS, keep results above cosine threshold."""
-        started_at = now_ms()
-        query_embedding = self.embedding_svc.encode([query])[0]
-        raw = self.vector_store.search(query_embedding, top_k=top_k)
-        filtered = [r for r in raw if r.get("similarity_score", 0.0) >= self.match_threshold]
-        duration_ms = round(now_ms() - started_at, 2)
-        rag_retrieval_total.inc(top_k=str(top_k))
-        rag_retrieval_duration_ms.observe(duration_ms, top_k=str(top_k))
-        logger.info(
-            "rag_retrieval_completed",
-            extra={
-                "event": "rag_retrieval_completed",
-                "query_length": len(query),
-                "top_k": top_k,
-                "retrieved_count": len(raw),
-                "filtered_count": len(filtered),
-                "match_threshold": self.match_threshold,
-                "duration_ms": duration_ms,
-            },
-        )
-        return filtered
+        with traced_span(
+            "rag.retrieve",
+            rag_top_k=top_k,
+            rag_match_threshold=self.match_threshold,
+            query_length=len(query),
+        ) as span:
+            started_at = now_ms()
+            query_embedding = self.embedding_svc.encode([query])[0]
+            raw = self.vector_store.search(query_embedding, top_k=top_k)
+            filtered = [r for r in raw if r.get("similarity_score", 0.0) >= self.match_threshold]
+            duration_ms = round(now_ms() - started_at, 2)
+            rag_retrieval_total.inc(top_k=str(top_k))
+            rag_retrieval_duration_ms.observe(duration_ms, top_k=str(top_k))
+            logger.info(
+                "rag_retrieval_completed",
+                extra={
+                    "event": "rag_retrieval_completed",
+                    "query_length": len(query),
+                    "top_k": top_k,
+                    "retrieved_count": len(raw),
+                    "filtered_count": len(filtered),
+                    "match_threshold": self.match_threshold,
+                    "duration_ms": duration_ms,
+                },
+            )
+            if span is not None:
+                span.set_attribute("rag.retrieved_count", len(raw))
+                span.set_attribute("rag.filtered_count", len(filtered))
+                span.set_attribute("rag.duration_ms", duration_ms)
+            return filtered
 
     # ------------------------------------------------------------------
     # Prompt construction

@@ -39,6 +39,13 @@ class AuthenticationError(NeneBotError):
         super().__init__(message, code="auth_required", status_code=401)
 
 
+class AuthorizationError(NeneBotError):
+    """Raised when a caller lacks the required permission scope."""
+
+    def __init__(self, message: str = "API token lacks required scope.") -> None:
+        super().__init__(message, code="forbidden", status_code=403)
+
+
 class LLMTimeoutError(LLMInferenceError):
     """Raised when the provider does not answer in time."""
 

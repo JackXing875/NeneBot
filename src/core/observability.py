@@ -49,6 +49,8 @@ class JsonFormatter(logging.Formatter):
             "auth_subject",
             "client_ip",
             "session_id",
+            "auth_token_preview",
+            "auth_scopes",
         ):
             value = getattr(record, field, None)
             if value is not None:
