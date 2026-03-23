@@ -8,13 +8,14 @@ and stores them in the FAISS vector database alongside their metadata.
 import json
 import logging
 import os
+import sys
 from typing import Any, Dict, List
 
 from tqdm import tqdm
 
-from src.core.config import settings
-from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
-from src.services.embedding_svc import EmbeddingService
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -43,21 +44,15 @@ def load_jsonl_data(file_path: str) -> List[Dict[str, Any]]:
 
 def main() -> None:
     """Main execution function for initializing the vector database."""
-    logger.info("Starting vector database initialization process...")
+    from src.core.config import settings
+    from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
+    from src.services.embedding_svc import EmbeddingService
+    from src.services.nene_tagging import infer_tags, should_exclude_from_retrieval
 
-    # Always start clean so the new cosine index format is written correctly.
-    for stale_path in (settings.vector_index_path, settings.knowledge_meta_path):
-        if os.path.exists(stale_path):
-            os.remove(stale_path)
-            logger.info(f"Removed stale index file: {stale_path}")
+    logger.info("Starting vector database initialization process...")
 
     # 1. Initialize core services
     embedding_svc = EmbeddingService()
-    vector_store = FaissVectorStore(
-        dimension=settings.vector_dim,
-        index_path=settings.vector_index_path,
-        meta_path=settings.knowledge_meta_path,
-    )
 
     # 2. Load raw data
     raw_data = load_jsonl_data(settings.data_path)
@@ -67,10 +62,26 @@ def main() -> None:
 
     logger.info(f"Successfully loaded {len(raw_data)} dialogues.")
 
+    # Always start clean so the new cosine index format is written correctly.
+    # Defer deletion until all critical dependencies are ready, so a failed model load
+    # does not destroy the previously working index.
+    for stale_path in (settings.vector_index_path, settings.knowledge_meta_path):
+        if os.path.exists(stale_path):
+            os.remove(stale_path)
+            logger.info(f"Removed stale index file: {stale_path}")
+
+    vector_store = FaissVectorStore(
+        dimension=settings.vector_dim,
+        index_path=settings.vector_index_path,
+        meta_path=settings.knowledge_meta_path,
+    )
+
     # 3. Process data in batches to prevent Out-Of-Memory (OOM) errors
     batch_size = 64
     # texts_to_embed: List[str] = []
     # metadata_to_store: List[Dict[str, str]] = []
+
+    skipped_count = 0
 
     for i in tqdm(range(0, len(raw_data), batch_size), desc="Processing Batches"):
         batch_items = raw_data[i : i + batch_size]
@@ -90,9 +101,18 @@ def main() -> None:
                     bot_text = msg.get("content")
 
             if user_text and bot_text:
+                if should_exclude_from_retrieval(str(user_text), str(bot_text)):
+                    skipped_count += 1
+                    continue
                 batch_texts.append(user_text)
                 # Store the bot's response as metadata to retrieve later
-                batch_meta.append({"bot_response": bot_text})
+                batch_meta.append(
+                    {
+                        "bot_response": bot_text,
+                        "query_tags": infer_tags(user_text),
+                        "response_tags": infer_tags(bot_text),
+                    }
+                )
 
         if batch_texts:
             # Generate embeddings for the user queries
@@ -100,7 +120,12 @@ def main() -> None:
             # Add vectors and metadata to the FAISS store
             vector_store.add_texts(texts=batch_texts, embeddings=embeddings, metadata=batch_meta)
 
-    logger.info(f"Vector database initialization complete. Saved to {settings.vector_index_path}")
+    logger.info(
+        "Vector database initialization complete. Saved to %s (indexed=%s skipped=%s)",
+        settings.vector_index_path,
+        vector_store.index.ntotal,
+        skipped_count,
+    )
 
 
 if __name__ == "__main__":

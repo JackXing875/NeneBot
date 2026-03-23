@@ -225,6 +225,7 @@ env/
 *.json
 *.bin
 *.csv
+!data/raw/train.jsonl
 
 models/
 .huggingface/

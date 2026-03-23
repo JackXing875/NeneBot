@@ -32,8 +32,19 @@ class EmbeddingService:
         logger.info(f"Loading embedding model: {settings.embedding_model_name}")
         logger.info(f"Using device: {self.device}")
 
-        # Load the model specified in the global settings
-        self.model = SentenceTransformer(settings.embedding_model_name, device=self.device)
+        # Prefer the normal path first, then fall back to offline cache-only mode.
+        try:
+            self.model = SentenceTransformer(settings.embedding_model_name, device=self.device)
+        except Exception as exc:
+            logger.warning(
+                "Failed to load embedding model with network access enabled; "
+                f"retrying from local cache only: {exc}"
+            )
+            self.model = SentenceTransformer(
+                settings.embedding_model_name,
+                device=self.device,
+                local_files_only=True,
+            )
 
     def encode(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
         """Encodes a list of strings into dense vector representations.

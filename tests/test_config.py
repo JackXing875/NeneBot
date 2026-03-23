@@ -22,3 +22,11 @@ def test_resolve_env_files_defaults_to_dev(monkeypatch) -> None:
 def test_resolve_env_files_uses_selected_env(monkeypatch) -> None:
     monkeypatch.setenv("APP_ENV", "prod")
     assert resolve_env_files() == (".env", ".env.prod")
+
+
+def test_settings_allow_data_path_override(monkeypatch) -> None:
+    monkeypatch.setenv("DATA_PATH", "/tmp/custom-train.jsonl")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.data_path == "/tmp/custom-train.jsonl"
