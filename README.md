@@ -172,6 +172,27 @@ chmod +x scripts/setup.sh scripts/run.sh
 >
 > **Important:** Do **not** open `frontend/index.html` directly in the browser. The application requires a running FastAPI backend (`/v1/*`) and should be accessed through the Vite dev server (`5173`) or the compiled production build served by FastAPI.
 
+### Unified Launcher
+
+For day-to-day usage, prefer the unified launcher instead of remembering multiple raw commands:
+
+```bash
+# Full local development mode: backend + frontend
+python scripts/launch.py dev
+
+# Backend only
+python scripts/launch.py local
+
+# Telegram polling bot
+python scripts/launch.py telegram
+```
+
+If you already created a local virtual environment, use:
+
+```bash
+./venv/bin/python scripts/launch.py dev
+```
+
 ### Option C — Single-Port Local Run (production-like)
 
 If you want to access the full app from **one URL only** instead of running Vite separately:
@@ -366,7 +387,7 @@ cp .env.example .env
 # TELEGRAM_BOT_TOKEN=123456:ABC...
 # LLM_PROVIDER=deepseek   # or ollama / claude / openai
 
-python -m src.adapters.telegram
+python scripts/launch.py telegram
 ```
 
 Notes:
@@ -428,7 +449,8 @@ For developers who want to tweak the bot, you can easily customize Nene:
 * **Rebuild the Memory Index**: If you replace `data/raw/train.jsonl`, run `python scripts/init_vector_db.py` to regenerate `vector_store/`.
 * **Session Persistence**: Set `SESSION_BACKEND=redis` and configure `REDIS_URL` to persist chat memory across restarts.
 * **Operations**: Use `/health` for diagnostics and `X-Request-ID` to correlate client failures with server logs.
-* **Telegram Adapter**: Set `TELEGRAM_BOT_TOKEN` and run `python -m src.adapters.telegram` to attach the bot to Telegram via long polling.
+* **Unified Launcher**: Use `python scripts/launch.py dev`, `local`, or `telegram` depending on the runtime mode you want.
+* **Telegram Adapter**: Set `TELEGRAM_BOT_TOKEN` and run `python scripts/launch.py telegram` to attach the bot to Telegram via long polling.
 
 ---
 
