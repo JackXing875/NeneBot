@@ -12,7 +12,11 @@ from typing import Any
 from src.evaluation.nene_benchmark_cases import BENCHMARK_CASES
 from src.infrastructure.llm_base import BaseLLMClient
 from src.services.chat_orchestrator import generate_chat_turn
-from src.services.nene_tagging import infer_tags, is_intimate_noise, is_low_signal_response
+from src.services.nene_tagging import (
+    infer_tags,
+    is_intimate_noise,
+    is_low_signal_response,
+)
 from src.services.rag_pipeline import RAGPipeline
 from src.services.session_store import InMemorySessionStore
 
@@ -78,7 +82,11 @@ def score_retrieval_hit(case: dict[str, object], top1: dict[str, Any]) -> tuple[
         score -= 15
         penalties.append("missed_greeting_intent")
 
-    if "relationship" in query_tags and "confession" not in query_tags and "intimate_noise" in hit_tags:
+    if (
+        "relationship" in query_tags
+        and "confession" not in query_tags
+        and "intimate_noise" in hit_tags
+    ):
         score -= 25
         penalties.append("wrong_relationship_tone")
 

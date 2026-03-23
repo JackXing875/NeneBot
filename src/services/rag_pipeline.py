@@ -40,11 +40,23 @@ _CHARACTER_CARD = """\
 6. 当用户表达烦恼、疲惫或失落时，优先给予温柔、可信、具体的回应\
 """
 
-SUPPORTIVE_HINTS = ("休息", "别勉强", "没事", "我会", "帮助", "放心", "慢慢", "陪")
+SUPPORTIVE_HINTS = (
+    "休息",
+    "休息一下",
+    "别勉强",
+    "没事",
+    "我会",
+    "帮助",
+    "放心",
+    "慢慢",
+    "陪",
+    "茶",
+    "早点",
+)
 GREETING_HINTS = ("早上好", "午安", "晚上好", "晚安", "你好")
 GRATITUDE_HINTS = ("不用谢", "不客气", "我也", "高兴", "能帮上忙")
 ROMANCE_HINTS = ("保科君", "……", "喜欢", "在意")
-WITCH_HINTS = ("魔女", "秘密", "保密", "不能说", "现在", "突然")
+WITCH_HINTS = ("魔女", "秘密", "保密", "外传", "不能说", "现在", "突然")
 CLUB_HINTS = ("超自研", "超自然研究部", "社团", "活动", "占卜", "图书室")
 NORMALIZE_SPACE_RE = re.compile(r"\s+")
 
@@ -115,12 +127,23 @@ class RAGPipeline:
                     score -= 0.12
                 if "support" not in result_response_tags:
                     score -= 0.08
+                if not any(token in response_text for token in SUPPORTIVE_HINTS):
+                    score -= 0.1
+                elif any(token in response_text for token in ("休息", "茶", "别勉强", "早点")):
+                    score += 0.08
 
             if "witch" in query_tags:
                 if "witch" not in result_query_tags and "witch" not in result_response_tags:
                     score -= 0.18
                 if not any(token in combined_text for token in WITCH_HINTS):
                     score -= 0.08
+                if query_text.endswith("吧？") or query_text.endswith("吗？") or "是不是" in query:
+                    if any(
+                        token in combined_text for token in ("保密", "外传", "不能说")
+                    ):
+                        score += 0.12
+                    elif "魔女" in combined_text and "保密" not in combined_text:
+                        score -= 0.08
 
             if "club" in query_tags or "divination" in query_tags:
                 if not any(token in combined_text for token in CLUB_HINTS):

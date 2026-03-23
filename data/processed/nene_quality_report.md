@@ -23,6 +23,6 @@
 - Case count: `8`
 - Non-empty retrieval rate: `1.0`
 - Clean retrieval rate: `1.0`
-- Average top1 similarity: `0.7502`
+- Average top1 similarity: `0.7286`
 - Average retrieval quality score: `92.5`
 

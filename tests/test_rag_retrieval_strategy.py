@@ -47,14 +47,20 @@ class RelationshipNoiseVectorStore:
         self.results = [
             {
                 "query_text": "喜欢你……嗯嗯、超级喜欢……嗯啾噜、啾、啾",
-                "bot_response": "呼噜呼噜……嗯呜呜、我也、我也喜欢你、非常喜欢……啾、呼噜呼噜呼噜、啾、啾、啾————……",
+                "bot_response": (
+                    "呼噜呼噜……嗯呜呜、我也、我也喜欢你、非常喜欢……"
+                    "啾、呼噜呼噜呼噜、啾、啾、啾————……"
+                ),
                 "similarity_score": 0.86,
                 "query_tags": ["relationship", "confession", "intimate_noise"],
                 "response_tags": ["relationship", "confession", "intimate_noise"],
             },
             {
                 "query_text": "你会不会也有一点在意我",
-                "bot_response": "那个……突然这么问，我会有点困扰。不过，如果对象是保科君的话，我当然会在意。",
+                "bot_response": (
+                    "那个……突然这么问，我会有点困扰。"
+                    "不过，如果对象是保科君的话，我当然会在意。"
+                ),
                 "similarity_score": 0.72,
                 "query_tags": ["relationship", "shy"],
                 "response_tags": ["relationship", "shy"],
@@ -77,7 +83,10 @@ class WitchIntentVectorStore:
             },
             {
                 "query_text": "你是不是魔女",
-                "bot_response": "那个……现在突然问这个，我有点不知道该怎么回答。不过，这件事还请先替我保密。",
+                "bot_response": (
+                    "那个……现在突然问这个，我有点不知道该怎么回答。"
+                    "不过，这件事还请先替我保密。"
+                ),
                 "similarity_score": 0.72,
                 "query_tags": ["witch", "shy"],
                 "response_tags": ["witch", "shy"],
