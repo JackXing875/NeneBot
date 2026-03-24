@@ -33,3 +33,18 @@ def test_build_messages_uses_nene_character_card_and_reference_block() -> None:
     assert "不直接照搬" in messages[0]["content"]
     assert "参考样本" in messages[0]["content"]
     assert messages[-1] == {"role": "user", "content": "今天有点累"}
+
+
+def test_build_messages_includes_response_language_instruction() -> None:
+    pipeline = RAGPipeline(
+        vector_store=DummyVectorStore(),  # type: ignore[arg-type]
+        embedding_svc=DummyEmbeddingService(),  # type: ignore[arg-type]
+    )
+
+    messages = pipeline.build_messages(
+        query="please use English",
+        context_results=[],
+        response_language="en",
+    )
+
+    assert "本轮请使用English自然回复" in messages[0]["content"]

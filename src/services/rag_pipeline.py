@@ -63,6 +63,11 @@ ROMANCE_HINTS = ("保科君", "……", "喜欢", "在意")
 WITCH_HINTS = ("魔女", "秘密", "保密", "外传", "不能说", "现在", "突然")
 CLUB_HINTS = ("超自研", "超自然研究部", "社团", "活动", "占卜", "图书室")
 NORMALIZE_SPACE_RE = re.compile(r"\s+")
+LANGUAGE_LABELS = {
+    "zh": "中文",
+    "en": "English",
+    "ja": "日本語",
+}
 
 
 class RAGPipeline:
@@ -250,6 +255,7 @@ class RAGPipeline:
         query: str,
         context_results: List[Dict[str, Any]],
         history: Optional[List[Dict[str, str]]] = None,
+        response_language: str = "zh",
     ) -> List[Dict[str, str]]:
         """Assemble the ChatML messages list for /api/chat.
 
@@ -269,7 +275,15 @@ class RAGPipeline:
         else:
             rag_block = "【参考样本】\n（无相关历史样本，请根据性格自由发挥）"
 
-        system_content = f"{_CHARACTER_CARD}\n\n{rag_block}"
+        language_name = LANGUAGE_LABELS.get(response_language, "中文")
+        language_block = (
+            "【回复语言】\n"
+            f"- 本轮请使用{language_name}自然回复\n"
+            "- 不要翻译腔，不要故意堆砌敬语或书面语\n"
+            "- 如果用户只是非常简单的英文招呼词，也可以继续自然使用中文\n"
+        )
+
+        system_content = f"{_CHARACTER_CARD}\n\n{language_block}\n{rag_block}"
 
         messages: List[Dict[str, str]] = [{"role": "system", "content": system_content}]
         if history:
@@ -286,8 +300,14 @@ class RAGPipeline:
         query: str,
         top_k: int = 3,
         history: Optional[List[Dict[str, str]]] = None,
+        response_language: str = "zh",
     ) -> Tuple[List[Dict[str, str]], List[Dict[str, Any]]]:
         """Returns (messages_for_llm, filtered_contexts)."""
         contexts = self.retrieve_and_filter(query, top_k)
-        messages = self.build_messages(query, contexts, history)
+        messages = self.build_messages(
+            query,
+            contexts,
+            history,
+            response_language=response_language,
+        )
         return messages, contexts

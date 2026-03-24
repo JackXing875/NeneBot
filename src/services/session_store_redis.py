@@ -21,6 +21,7 @@ class RedisSessionStore:
         ttl_seconds: int = 86400,
         client: Redis | None = None,
         key_prefix: str = "nenebot:session:",
+        language_key_prefix: str = "nenebot:session-lang:",
     ) -> None:
         self.client = (
             client
@@ -30,6 +31,7 @@ class RedisSessionStore:
         self.max_history = max_history
         self.ttl_seconds = ttl_seconds
         self.key_prefix = key_prefix
+        self.language_key_prefix = language_key_prefix
 
     def get_or_create(self, session_id: str | None) -> str:
         return session_id if session_id else str(uuid.uuid4())
@@ -55,11 +57,28 @@ class RedisSessionStore:
         if self.ttl_seconds > 0:
             self.client.expire(self._key(session_id), self.ttl_seconds)
 
+    def get_preferred_language(self, session_id: str) -> str | None:
+        language = self.client.get(self._language_key(session_id))
+        return language if isinstance(language, str) and language else None
+
+    def set_preferred_language(self, session_id: str, language: str | None) -> None:
+        key = self._language_key(session_id)
+        if language is None:
+            self.client.delete(key)
+            return
+        self.client.set(key, language)
+        if self.ttl_seconds > 0:
+            self.client.expire(key, self.ttl_seconds)
+
     def clear(self, session_id: str) -> None:
         self.client.delete(self._key(session_id))
+        self.client.delete(self._language_key(session_id))
 
     def _key(self, session_id: str) -> str:
         return f"{self.key_prefix}{session_id}"
+
+    def _language_key(self, session_id: str) -> str:
+        return f"{self.language_key_prefix}{session_id}"
 
     def ping(self) -> bool:
         """Expose backend liveness checks for health reporting."""

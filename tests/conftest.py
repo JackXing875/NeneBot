@@ -23,8 +23,9 @@ class FakeRAGPipeline:
         query: str,
         top_k: int = 3,
         history: list[dict[str, str]] | None = None,
+        response_language: str = "zh",
     ) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
-        messages = [{"role": "system", "content": "stub"}]
+        messages = [{"role": "system", "content": f"stub:{response_language}"}]
         if history:
             messages.extend(history)
         messages.append({"role": "user", "content": query})

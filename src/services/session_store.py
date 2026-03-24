@@ -21,6 +21,12 @@ class SessionStore(Protocol):
     def add_turn(self, session_id: str, user_msg: str, assistant_msg: str) -> None:
         """Append a full user+assistant turn."""
 
+    def get_preferred_language(self, session_id: str) -> str | None:
+        """Return the stored reply-language preference for the session."""
+
+    def set_preferred_language(self, session_id: str, language: str | None) -> None:
+        """Persist or clear the session-level reply-language preference."""
+
     def clear(self, session_id: str) -> None:
         """Delete all history for a session."""
 
@@ -32,6 +38,7 @@ class InMemorySessionStore:
 
     def __init__(self, max_history: int = 20) -> None:
         self._sessions: Dict[str, List[ChatMessage]] = defaultdict(list)
+        self._language_preferences: Dict[str, str] = {}
         self.max_history = max_history
 
     def get_or_create(self, session_id: str | None) -> str:
@@ -47,5 +54,15 @@ class InMemorySessionStore:
         if len(buf) > self.max_history:
             self._sessions[session_id] = buf[-self.max_history :]
 
+    def get_preferred_language(self, session_id: str) -> str | None:
+        return self._language_preferences.get(session_id)
+
+    def set_preferred_language(self, session_id: str, language: str | None) -> None:
+        if language is None:
+            self._language_preferences.pop(session_id, None)
+            return
+        self._language_preferences[session_id] = language
+
     def clear(self, session_id: str) -> None:
         self._sessions.pop(session_id, None)
+        self._language_preferences.pop(session_id, None)

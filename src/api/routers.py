@@ -14,7 +14,7 @@ from src.core.auth import require_api_scope
 from src.core.metrics import llm_request_duration_ms, llm_requests_total
 from src.core.observability import now_ms
 from src.infrastructure.llm_base import BaseLLMClient
-from src.services.chat_orchestrator import generate_chat_turn
+from src.services.chat_orchestrator import generate_chat_turn, prepare_chat_turn
 from src.services.rag_pipeline import RAGPipeline
 from src.services.session_store import SessionStore
 
@@ -109,9 +109,16 @@ async def chat_stream_endpoint(
         error – {"type":"error", "message":"..."}
         done  – {"type":"done"}
     """
-    session_id = sessions.get_or_create(request.session_id)
-    history = sessions.get_history(session_id)
-    messages, contexts = rag.process_query(request.query, request.top_k, history)
+    prepared = prepare_chat_turn(
+        query=request.query,
+        session_id=request.session_id,
+        top_k=request.top_k,
+        rag=rag,
+        sessions=sessions,
+    )
+    session_id = prepared.session_id
+    messages = prepared.messages
+    contexts = prepared.contexts
 
     refs_payload = [
         {
