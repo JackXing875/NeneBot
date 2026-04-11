@@ -206,10 +206,7 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-
-# -----------------------------
-# Python 运行缓存与虚拟环境
-# -----------------------------
+# Python bytecode and virtual environments
 __pycache__/
 *.py[cod]
 *$py.class
@@ -218,6 +215,7 @@ venv/
 env/
 .env
 
+# Vector store files
 /vector_store/
 !src/infrastructure/vector_store/
 !src/infrastructure/vector_store/*.py
@@ -227,11 +225,15 @@ env/
 *.csv
 !data/raw/train.jsonl
 
+# Model files
 models/
 .huggingface/
 .cache/
 
+# IDE and OS files
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
+
+.codex
