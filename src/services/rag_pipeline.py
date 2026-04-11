@@ -2,6 +2,7 @@
 
 import logging
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.core.config import settings
@@ -13,6 +14,20 @@ from src.services.embedding_svc import EmbeddingService
 from src.services.nene_tagging import infer_tags, is_intimate_noise, is_low_signal_response
 
 logger = logging.getLogger(__name__)
+
+_PERSONA_PATH = Path(__file__).resolve().parents[2] / "data" / "persona" / "nene.md"
+_PERSONA_SECTION_ALLOWLIST = (
+    "你这个人",
+    "你跟人聊天的温度",
+    "你觉得好笑的东西",
+    "你脑子里装的东西",
+    "你想事情的方式",
+)
+_PERSONA_SKIP_SUBSTRINGS = (
+    "发情期",
+    "怎么收集心之碎片",
+    "突然变得奇怪的身体",
+)
 
 # ---------------------------------------------------------------------------
 # Character card – structured persona for Ayachi Nene
@@ -43,6 +58,81 @@ _CHARACTER_CARD = """\
 7. 任何时候都以【角色设定】为最高优先级；如果参考样本与角色设定冲突，以角色设定为准
 8. 不要擅自编造学校、职务、社团、经历等事实性设定；拿不准时宁可少说，也不要说错\
 """
+
+
+def _clean_persona_line(raw_line: str) -> str:
+    stripped = raw_line.strip()
+    if not stripped or stripped == "---" or stripped.startswith("#"):
+        return ""
+    return stripped.replace("**", "").strip()
+
+
+def _parse_persona_sections(markdown_text: str) -> dict[str, list[str]]:
+    sections: dict[str, list[str]] = {}
+    current_section: str | None = None
+
+    for raw_line in markdown_text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("## "):
+            current_section = line[3:].strip()
+            sections.setdefault(current_section, [])
+            continue
+
+        if current_section is None:
+            continue
+
+        cleaned = _clean_persona_line(raw_line)
+        if not cleaned:
+            continue
+
+        if any(token in cleaned for token in _PERSONA_SKIP_SUBSTRINGS):
+            continue
+
+        sections[current_section].append(cleaned)
+
+    return sections
+
+
+def _combine_persona_lines(lines: list[str]) -> list[str]:
+    combined: list[str] = []
+    idx = 0
+    while idx < len(lines):
+        current = lines[idx]
+        if current.endswith("：") and idx + 1 < len(lines) and not lines[idx + 1].endswith("："):
+            combined.append(f"{current}{lines[idx + 1]}")
+            idx += 2
+            continue
+        combined.append(current)
+        idx += 1
+    return combined
+
+
+def _load_persona_reference_block(persona_path: Path) -> str:
+    try:
+        markdown_text = persona_path.read_text(encoding="utf-8")
+    except OSError:
+        logger.warning("persona_file_unavailable", extra={"path": str(persona_path)})
+        return ""
+
+    sections = _parse_persona_sections(markdown_text)
+    selected_lines: list[str] = []
+    for section_title in _PERSONA_SECTION_ALLOWLIST:
+        selected_lines.extend(sections.get(section_title, []))
+
+    persona_lines = _combine_persona_lines(selected_lines)
+    if not persona_lines:
+        return ""
+
+    bullets = "\n".join(f"- {line}" for line in persona_lines)
+    return (
+        "【角色补充参考】\n"
+        "- 以下内容来自 data/persona/nene.md，只用于稳定宁宁的语气、反应和禁忌\n"
+        "- 不要逐条复述这些资料，不要把回复写成人物简介或设定说明\n"
+        f"{bullets}"
+    )
+
+
+_PERSONA_REFERENCE_BLOCK = _load_persona_reference_block(_PERSONA_PATH)
 
 SUPPORTIVE_HINTS = (
     "休息",
@@ -283,7 +373,12 @@ class RAGPipeline:
             "- 如果用户只是非常简单的英文招呼词，也可以继续自然使用中文\n"
         )
 
-        system_content = f"{_CHARACTER_CARD}\n\n{language_block}\n{rag_block}"
+        system_sections = [_CHARACTER_CARD]
+        if _PERSONA_REFERENCE_BLOCK:
+            system_sections.append(_PERSONA_REFERENCE_BLOCK)
+        system_sections.append(language_block)
+        system_sections.append(rag_block)
+        system_content = "\n\n".join(system_sections)
 
         messages: List[Dict[str, str]] = [{"role": "system", "content": system_content}]
         if history:

@@ -32,6 +32,8 @@ def test_build_messages_uses_nene_character_card_and_reference_block() -> None:
     assert "绫地宁宁" in messages[0]["content"]
     assert "不直接照搬" in messages[0]["content"]
     assert "参考样本" in messages[0]["content"]
+    assert "角色补充参考" in messages[0]["content"]
+    assert "脸皮非常薄" in messages[0]["content"]
     assert messages[-1] == {"role": "user", "content": "今天有点累"}
 
 
@@ -48,3 +50,19 @@ def test_build_messages_includes_response_language_instruction() -> None:
     )
 
     assert "本轮请使用English自然回复" in messages[0]["content"]
+
+
+def test_build_messages_uses_persona_markdown_as_background_reference() -> None:
+    pipeline = RAGPipeline(
+        vector_store=DummyVectorStore(),  # type: ignore[arg-type]
+        embedding_svc=DummyEmbeddingService(),  # type: ignore[arg-type]
+    )
+
+    messages = pipeline.build_messages(
+        query="有人突然开了个很怪的玩笑",
+        context_results=[],
+    )
+
+    system_prompt = messages[0]["content"]
+    assert "不擅长接那种“荒谬”或者“抽象”的梗" in system_prompt
+    assert "不要把回复写成人物简介或设定说明" in system_prompt
