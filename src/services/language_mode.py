@@ -133,12 +133,12 @@ def detect_explicit_language_switch(query: str) -> str | None:
         if any(pattern in normalized for pattern in patterns):
             return language
 
-    for language, patterns in JAPANESE_SWITCH_PATTERNS.items():
-        if any(pattern in normalized for pattern in patterns):
+    for language, str_patterns in JAPANESE_SWITCH_PATTERNS.items():
+        if any(pattern in normalized for pattern in str_patterns):
             return language
 
-    for language, patterns in ENGLISH_SWITCH_PATTERNS.items():
-        if any(pattern.search(normalized) for pattern in patterns):
+    for language, re_patterns in ENGLISH_SWITCH_PATTERNS.items():
+        if any(pattern.search(normalized) for pattern in re_patterns):
             return language
 
     return None

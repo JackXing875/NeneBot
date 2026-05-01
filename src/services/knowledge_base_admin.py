@@ -95,7 +95,7 @@ def write_jsonl_dataset(content: str, file_path: str) -> dict[str, Any]:
 
 
 def rebuild_knowledge_base() -> dict[str, Any]:
-    from scripts.init_vector_db import main as build_index  # type: ignore[import]
+    from scripts.init_vector_db import main as build_index
 
     build_index()
     vector_store = FaissVectorStore(

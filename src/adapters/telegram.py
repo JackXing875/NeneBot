@@ -2,7 +2,7 @@
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from fastapi import HTTPException
@@ -40,8 +40,8 @@ class TelegramBotAPI:
         async with httpx.AsyncClient(timeout=timeout + 10) as client:
             response = await client.get(f"{self.base_url}/getUpdates", params=params)
             response.raise_for_status()
-            payload = response.json()
-            return payload.get("result", [])
+            payload: dict[str, Any] = response.json()
+            return cast("list[dict[str, Any]]", payload.get("result", []))
 
     async def send_message(
         self,

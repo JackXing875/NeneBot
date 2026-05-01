@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from secrets import compare_digest
@@ -146,7 +147,7 @@ def require_api_auth(request: Request) -> None:
     request.state.auth_scopes = sorted(matched.scopes)
 
 
-def require_api_scope(scope: str):
+def require_api_scope(scope: str) -> Callable[[Request], None]:
     """Return a FastAPI dependency that enforces auth plus a named scope."""
 
     def _dependency(request: Request) -> None:

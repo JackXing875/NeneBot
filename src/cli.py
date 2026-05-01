@@ -103,12 +103,12 @@ def ollama_is_reachable(base_url: str) -> bool:
     request = urllib.request.Request(tags_url, method="GET")
     try:
         with urllib.request.urlopen(request, timeout=2) as response:
-            return 200 <= response.status < 500
+            return bool(200 <= response.status < 500)
     except (urllib.error.URLError, TimeoutError, ValueError):
         return False
 
 
-def ensure_ollama_runtime(children: list[subprocess.Popen[object]]) -> None:
+def ensure_ollama_runtime(children: list[subprocess.Popen[bytes]]) -> None:
     """Start a local Ollama daemon if the current provider needs it."""
     if settings.llm_provider != "ollama":
         return
@@ -138,7 +138,7 @@ def ensure_ollama_runtime(children: list[subprocess.Popen[object]]) -> None:
     raise RuntimeError("Started `ollama serve`, but the Ollama API is still unreachable.")
 
 
-def terminate_processes(children: Sequence[subprocess.Popen[object]]) -> None:
+def terminate_processes(children: Sequence[subprocess.Popen[bytes]]) -> None:
     """Terminate child processes started by the launcher."""
     for process in reversed(children):
         if process.poll() is not None:
@@ -178,7 +178,7 @@ def run_dev(args: argparse.Namespace) -> int:
     if not frontend_dir.exists():
         raise RuntimeError(f"Frontend directory not found: {frontend_dir}")
 
-    children: list[subprocess.Popen[object]] = []
+    children: list[subprocess.Popen[bytes]] = []
     try:
         if not args.skip_ollama_check:
             ensure_ollama_runtime(children)

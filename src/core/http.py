@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import HTTPException, Request
@@ -34,7 +35,9 @@ def error_payload(code: str, message: str, status_code: int) -> dict[str, Any]:
 class RequestContextMiddleware(BaseHTTPMiddleware):
     """Attach request ids, emit access logs, and expose the id to clients."""
 
-    async def dispatch(self, request: Request, call_next) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
         request.state.request_id = request_id
         token = set_request_id(request_id)

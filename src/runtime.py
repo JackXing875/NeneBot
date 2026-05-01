@@ -91,7 +91,7 @@ def ensure_index_exists() -> None:
         return
 
     logger.info("Vector index not found – building from scratch (this may take a minute)...")
-    from scripts.init_vector_db import main as build_index  # type: ignore[import]
+    from scripts.init_vector_db import main as build_index
 
     build_index()
     logger.info("Vector index build complete.")

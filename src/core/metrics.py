@@ -107,10 +107,10 @@ class MetricsRegistry:
     def render(self) -> str:
         lines: list[str] = []
         with self._lock:
-            for metric in self._counters.values():
-                lines.extend(metric.render())
-            for metric in self._histograms.values():
-                lines.extend(metric.render())
+            for counter_metric in self._counters.values():
+                lines.extend(counter_metric.render())
+            for histogram_metric in self._histograms.values():
+                lines.extend(histogram_metric.render())
         return "\n".join(lines) + "\n"
 
 
