@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 from typing import Literal, Optional
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -124,6 +125,12 @@ class Settings(BaseSettings):
     telegram_webhook_path: str = "/integrations/telegram/webhook"
     telegram_webhook_secret: Optional[str] = None
     telegram_public_base_url: Optional[str] = None
+
+    @field_validator("llm_provider", mode="before")
+    @classmethod
+    def _normalize_llm_provider(cls, v: object) -> str:
+        """Normalize to lowercase so `DeepSeek` and `DEEPSEEK` both match the Literal."""
+        return str(v).strip().lower() if isinstance(v, str) else str(v)
 
     @property
     def effective_llm_model(self) -> str:
