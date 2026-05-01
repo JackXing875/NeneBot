@@ -54,3 +54,20 @@ def test_redis_session_store_persists_and_clears() -> None:
     store.clear(session_id)
     assert store.get_history(session_id) == []
     assert store.get_preferred_language(session_id) is None
+
+
+def test_redis_session_store_handles_bytes_client() -> None:
+    client = fakeredis.FakeRedis(decode_responses=False)
+    store = RedisSessionStore(
+        redis_url="redis://unused",
+        max_history=4,
+        ttl_seconds=60,
+        client=client,
+    )
+    session_id = store.get_or_create(None)
+    store.add_turn(session_id, "hello", "world")
+
+    assert store.get_history(session_id) == [
+        {"role": "user", "content": "hello"},
+        {"role": "assistant", "content": "world"},
+    ]
