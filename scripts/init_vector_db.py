@@ -63,12 +63,19 @@ def main() -> None:
     logger.info(f"Successfully loaded {len(raw_data)} dialogues.")
 
     # Always start clean so the new cosine index format is written correctly.
-    # Defer deletion until all critical dependencies are ready, so a failed model load
-    # does not destroy the previously working index.
+    # Back up the existing index before deletion so we can recover on failure.
     for stale_path in (settings.vector_index_path, settings.knowledge_meta_path):
         if os.path.exists(stale_path):
-            os.remove(stale_path)
-            logger.info(f"Removed stale index file: {stale_path}")
+            backup_path = stale_path + ".bak"
+            try:
+                if os.path.exists(backup_path):
+                    os.remove(backup_path)
+                os.rename(stale_path, backup_path)
+                logger.info(f"Backed up {stale_path} → {backup_path}")
+            except OSError as exc:
+                logger.warning(f"Could not back up {stale_path}: {exc}")
+                os.remove(stale_path)
+                logger.info(f"Removed stale index file: {stale_path}")
 
     vector_store = FaissVectorStore(
         dimension=settings.vector_dim,

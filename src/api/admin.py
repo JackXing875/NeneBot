@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.core.audit import audit_log
 from src.core.auth import configured_auth_identities, require_api_scope
@@ -29,7 +29,14 @@ admin_router = APIRouter(
 
 
 class KnowledgeImportRequest(BaseModel):
-    content: str = Field(..., min_length=1, description="JSONL dataset content.")
+    content: str = Field(
+        ...,
+        min_length=1,
+        description=(
+            "JSONL dataset content "
+            f"(max {settings.max_knowledge_import_bytes // 1024 // 1024} MiB by default)."
+        ),
+    )
     rebuild: bool = Field(
         True,
         description="Whether to rebuild the vector index immediately after import.",
@@ -38,6 +45,20 @@ class KnowledgeImportRequest(BaseModel):
         False,
         description="Validate dataset content without writing it to disk.",
     )
+
+    @field_validator("content")
+    @classmethod
+    def _enforce_byte_limit(cls, v: str) -> str:
+        """Validate that UTF-8 encoded content does not exceed the configured byte limit."""
+        byte_size = len(v.encode("utf-8"))
+        limit = settings.max_knowledge_import_bytes
+        if byte_size > limit:
+            limit_mib = limit / (1024 * 1024)
+            raise ValueError(
+                f"Content exceeds {limit_mib:.0f} MiB limit ({byte_size} bytes, "
+                f"max {limit} bytes)."
+            )
+        return v
 
 
 class KnowledgeActionResponse(BaseModel):
@@ -82,7 +103,7 @@ async def admin_overview(request: Request) -> dict[str, object]:
     app = request.app
     vector_store: FaissVectorStore = app.state.vector_store
     session_store: SessionStore = app.state.session_store
-    frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    frontend_dist = Path(settings.frontend_dist_dir)
     session_ok, session_error = check_session_backend(session_store)
 
     health = build_health_payload(
@@ -93,13 +114,7 @@ async def admin_overview(request: Request) -> dict[str, object]:
         session_backend_error=session_error,
     )
 
-    provider_model = (
-        settings.claude_model_name
-        if settings.llm_provider == "claude"
-        else settings.openai_compat_model
-        if settings.llm_provider in ("deepseek", "openai")
-        else settings.llm_model_name
-    )
+    provider_model = settings.effective_llm_model
 
     return {
         "service": {

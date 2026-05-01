@@ -48,6 +48,12 @@ def build_parser() -> argparse.ArgumentParser:
     dev_parser.add_argument("--port", type=int, default=settings.port)
     dev_parser.add_argument("--frontend-port", type=int, default=5173)
     dev_parser.add_argument("--skip-ollama-check", action="store_true")
+    dev_parser.add_argument(
+        "--boot-timeout",
+        type=int,
+        default=120,
+        help="Seconds to wait for backend health endpoint (first run may need 1–2 min).",
+    )
     dev_parser.set_defaults(handler=run_dev)
 
     return parser
@@ -182,15 +188,34 @@ def run_dev(args: argparse.Namespace) -> int:
             cwd=str(PROJECT_ROOT),
         )
         children.append(backend)
-        time.sleep(2)
-        if backend.poll() is not None:
-            return int(backend.returncode or 1)
 
+        # Start the frontend immediately — it can connect once the backend is ready.
         frontend = subprocess.Popen(
             choose_frontend_command(frontend_dir, port=args.frontend_port),
             cwd=str(frontend_dir),
         )
         children.append(frontend)
+
+        # Poll the health endpoint; first-run vector index build may take 1–2 minutes.
+        deadline = time.time() + args.boot_timeout
+        backend_ready = False
+        while time.time() < deadline:
+            if backend.poll() is not None:
+                return int(backend.returncode or 1)
+            try:
+                with urllib.request.urlopen(
+                    f"http://{args.host}:{args.port}/health/live", timeout=1
+                ) as resp:
+                    if 200 <= resp.status < 500:
+                        backend_ready = True
+                        break
+            except (urllib.error.URLError, TimeoutError, ValueError):
+                pass
+            time.sleep(0.5)
+
+        if not backend_ready:
+            print(f"Backend failed to start within {args.boot_timeout} seconds.")
+            return 1
 
         print("NeneBot dev mode is running.")
         print(f"Frontend: http://localhost:{args.frontend_port}")

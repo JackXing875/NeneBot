@@ -1,10 +1,12 @@
 """Session storage abstractions and in-memory implementation."""
 
+from __future__ import annotations
+
 import uuid
 from collections import defaultdict
-from typing import Dict, List, Protocol
+from typing import Protocol
 
-ChatMessage = Dict[str, str]
+ChatMessage = dict[str, str]
 
 
 class SessionStore(Protocol):
@@ -15,7 +17,7 @@ class SessionStore(Protocol):
     def get_or_create(self, session_id: str | None) -> str:
         """Return an existing session id or create a new one."""
 
-    def get_history(self, session_id: str) -> List[ChatMessage]:
+    def get_history(self, session_id: str) -> list[ChatMessage]:
         """Return a copy of the persisted message history."""
 
     def add_turn(self, session_id: str, user_msg: str, assistant_msg: str) -> None:
@@ -37,14 +39,14 @@ class InMemorySessionStore:
     backend_name = "memory"
 
     def __init__(self, max_history: int = 20) -> None:
-        self._sessions: Dict[str, List[ChatMessage]] = defaultdict(list)
-        self._language_preferences: Dict[str, str] = {}
+        self._sessions: dict[str, list[ChatMessage]] = defaultdict(list)
+        self._language_preferences: dict[str, str] = {}
         self.max_history = max_history
 
     def get_or_create(self, session_id: str | None) -> str:
         return session_id if session_id else str(uuid.uuid4())
 
-    def get_history(self, session_id: str) -> List[ChatMessage]:
+    def get_history(self, session_id: str) -> list[ChatMessage]:
         return list(self._sessions[session_id])
 
     def add_turn(self, session_id: str, user_msg: str, assistant_msg: str) -> None:

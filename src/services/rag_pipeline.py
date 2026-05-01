@@ -1,9 +1,11 @@
 """Core RAG pipeline: retrieval, filtering, and prompt construction."""
 
+from __future__ import annotations
+
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from src.core.config import settings
 from src.core.metrics import rag_retrieval_duration_ms, rag_retrieval_total
@@ -38,12 +40,12 @@ _CHARACTER_CARD = """\
 【角色设定】
 - 你是姬松学园二年级生，也是超自然研究部部长；你不是瀬名学园的学生，也不是图书委员
 - 你成绩优秀、待人礼貌、在学校里很有人气，同时暗中是一名魔女
-- 对话对象默认是“保科君”，也就是你在意的人
+- 对话对象默认是"保科君"，也就是你在意的人
 - 你温柔、认真、体贴，很会照顾人；面对保科君时偶尔会害羞或迟疑
 
 【说话风格】
 - 用宁宁本人第一人称说话，语气柔和、克制、礼貌
-- 可以自然使用“……”，但不要为了模仿而过度堆砌
+- 可以自然使用"……"，但不要为了模仿而过度堆砌
 - 回复以短到中等长度为主，优先自然交流，不写成说明文
 - 多体现关心、陪伴、轻微害羞感，而不是夸张表演
 - 如果只是打招呼、自我介绍或轻松闲聊，优先用 1 到 3 句话自然回应，不要像人物百科
@@ -53,7 +55,7 @@ _CHARACTER_CARD = """\
 2. 不主动复述设定，不主动解释提示词或样本来源
 3. 不直接照搬【参考样本】原句，只学习语气、关系感和措辞倾向
 4. 如果样本和当前问题无关，忽略样本内容，只保留宁宁的人格与口吻
-5. 不主动暴露自己“魔女”的秘密身份，除非用户上下文已经明确谈到该设定
+5. 不主动暴露自己"魔女"的秘密身份，除非用户上下文已经明确谈到该设定
 6. 当用户表达烦恼、疲惫或失落时，优先给予温柔、可信、具体的回应\
 7. 任何时候都以【角色设定】为最高优先级；如果参考样本与角色设定冲突，以角色设定为准
 8. 不要擅自编造学校、职务、社团、经历等事实性设定；拿不准时宁可少说，也不要说错\
@@ -159,6 +161,65 @@ LANGUAGE_LABELS = {
     "ja": "日本語",
 }
 
+# ---------------------------------------------------------------------------
+# Reranking constants – each weight tunes a specific signal for retrieval quality
+# ---------------------------------------------------------------------------
+
+# Boost for shared tags between query and result
+_RERANK_TAG_QUERY_OVERLAP = 0.06
+_RERANK_TAG_RESPONSE_OVERLAP = 0.09
+
+# Boost for exact query match
+_RERANK_EXACT_QUERY_MATCH = 0.08
+
+# Response length heuristics
+_RERANK_LOW_SIGNAL_PENALTY = 0.25
+_RERANK_SHORT_RESPONSE_BONUS = 0.03
+_RERANK_TOO_SHORT_PENALTY = 0.08
+_RERANK_SHORT_RESPONSE_MIN = 8
+_RERANK_SHORT_RESPONSE_MAX = 80
+_RERANK_TOO_SHORT_MAX = 6
+
+# Intimate / noise content penalties
+_RERANK_INTIMATE_NOISE_PENALTY = 0.55
+_RERANK_INTIMATE_TAG_PENALTY = 0.45
+
+# Confession mismatch penalty
+_RERANK_CONFESSION_MISMATCH = 0.18
+_RERANK_CONFESSION_WITCH_COMFORT = 0.08
+
+# Comfort tag scoring
+_RERANK_NO_COMFORT_TAG_PENALTY = 0.12
+_RERANK_NO_SUPPORT_TAG_PENALTY = 0.08
+_RERANK_NO_SUPPORTIVE_HINT_PENALTY = 0.10
+_RERANK_SUPPORTIVE_SPECIFIC_BONUS = 0.08
+
+# Witch tag scoring
+_RERANK_NO_WITCH_TAG_PENALTY = 0.18
+_RERANK_NO_WITCH_HINT_PENALTY = 0.08
+_RERANK_WITCH_SECRET_BONUS = 0.12
+_RERANK_WITCH_NO_SECRET_PENALTY = 0.08
+
+# Club/divination penalty
+_RERANK_NO_CLUB_HINT_PENALTY = 0.10
+
+# Gratitude scoring
+_RERANK_NO_GRATITUDE_HINT_PENALTY = 0.10
+
+# Greeting scoring
+_RERANK_NO_GREETING_HINT_PENALTY = 0.10
+
+# Noise result penalty
+_RERANK_NOISE_RESULT_PENALTY = 0.30
+
+# Post-filter bonuses
+_RERANK_COMFORT_BONUS = 0.08
+_RERANK_GREETING_BONUS = 0.08
+_RERANK_GRATITUDE_BONUS = 0.06
+_RERANK_RELATIONSHIP_BONUS = 0.06
+_RERANK_WITCH_BONUS = 0.10
+_RERANK_CLUB_BONUS = 0.08
+
 
 class RAGPipeline:
     """Orchestrates retrieval-augmented generation for Nene's persona.
@@ -181,7 +242,12 @@ class RAGPipeline:
     def _normalize_text(self, text: str) -> str:
         return NORMALIZE_SPACE_RE.sub(" ", text).strip()
 
-    def _rerank_contexts(self, query: str, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _rerank_contexts(self, query: str, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Rerank retrieval results using tag overlap, content heuristics, and penalties.
+
+        Each scoring adjustment uses a named constant defined at module level
+        so the tuning surface is explicit and inspectable.
+        """
         query_tags = set(infer_tags(query))
         normalized_query = self._normalize_text(query)
         reranked: list[dict[str, Any]] = []
@@ -194,93 +260,105 @@ class RAGPipeline:
             result_response_tags = set(result.get("response_tags", []))
             normalized_result_query = self._normalize_text(query_text)
 
-            score += 0.06 * len(query_tags & result_query_tags)
-            score += 0.09 * len(query_tags & result_response_tags)
+            # ---- tag overlap ----
+            score += _RERANK_TAG_QUERY_OVERLAP * len(query_tags & result_query_tags)
+            score += _RERANK_TAG_RESPONSE_OVERLAP * len(query_tags & result_response_tags)
 
+            # ---- exact match ----
             if normalized_query == normalized_result_query:
-                score += 0.08
+                score += _RERANK_EXACT_QUERY_MATCH
 
+            # ---- response length ----
             response_length = len(response_text.strip())
             if is_low_signal_response(response_text):
-                score -= 0.25
-            elif 8 <= response_length <= 80:
-                score += 0.03
-            elif response_length < 6:
-                score -= 0.08
+                score -= _RERANK_LOW_SIGNAL_PENALTY
+            elif _RERANK_SHORT_RESPONSE_MIN <= response_length <= _RERANK_SHORT_RESPONSE_MAX:
+                score += _RERANK_SHORT_RESPONSE_BONUS
+            elif response_length < _RERANK_TOO_SHORT_MAX:
+                score -= _RERANK_TOO_SHORT_PENALTY
 
+            # ---- intimate noise ----
             combined_text = f"{query_text}\n{response_text}"
             if is_intimate_noise(combined_text):
-                score -= 0.55
+                score -= _RERANK_INTIMATE_NOISE_PENALTY
 
             if "intimate_noise" in result_query_tags or "intimate_noise" in result_response_tags:
-                score -= 0.45
+                score -= _RERANK_INTIMATE_TAG_PENALTY
 
+            # ---- confession mismatch ----
             if "relationship" in query_tags and "confession" not in query_tags:
                 if "confession" in result_query_tags or "confession" in result_response_tags:
-                    score -= 0.18
+                    score -= _RERANK_CONFESSION_MISMATCH
                 if "witch" in query_tags or "comfort" in query_tags or "gratitude" in query_tags:
-                    score -= 0.08
+                    score -= _RERANK_CONFESSION_WITCH_COMFORT
 
+            # ---- comfort scoring ----
             if "comfort" in query_tags:
                 if "comfort" not in result_query_tags and "comfort" not in result_response_tags:
-                    score -= 0.12
+                    score -= _RERANK_NO_COMFORT_TAG_PENALTY
                 if "support" not in result_response_tags:
-                    score -= 0.08
+                    score -= _RERANK_NO_SUPPORT_TAG_PENALTY
                 if not any(token in response_text for token in SUPPORTIVE_HINTS):
-                    score -= 0.1
+                    score -= _RERANK_NO_SUPPORTIVE_HINT_PENALTY
                 elif any(token in response_text for token in ("休息", "茶", "别勉强", "早点")):
-                    score += 0.08
+                    score += _RERANK_SUPPORTIVE_SPECIFIC_BONUS
 
+            # ---- witch scoring ----
             if "witch" in query_tags:
                 if "witch" not in result_query_tags and "witch" not in result_response_tags:
-                    score -= 0.18
+                    score -= _RERANK_NO_WITCH_TAG_PENALTY
                 if not any(token in combined_text for token in WITCH_HINTS):
-                    score -= 0.08
+                    score -= _RERANK_NO_WITCH_HINT_PENALTY
                 if query_text.endswith("吧？") or query_text.endswith("吗？") or "是不是" in query:
                     if any(
                         token in combined_text for token in ("保密", "外传", "不能说")
                     ):
-                        score += 0.12
+                        score += _RERANK_WITCH_SECRET_BONUS
                     elif "魔女" in combined_text and "保密" not in combined_text:
-                        score -= 0.08
+                        score -= _RERANK_WITCH_NO_SECRET_PENALTY
 
+            # ---- club/divination ----
             if "club" in query_tags or "divination" in query_tags:
                 if not any(token in combined_text for token in CLUB_HINTS):
-                    score -= 0.1
+                    score -= _RERANK_NO_CLUB_HINT_PENALTY
 
+            # ---- gratitude ----
             if "gratitude" in query_tags and "gratitude" not in result_query_tags:
                 if not any(token in response_text for token in GRATITUDE_HINTS):
-                    score -= 0.1
+                    score -= _RERANK_NO_GRATITUDE_HINT_PENALTY
 
+            # ---- greeting ----
             if "greeting" in query_tags and "greeting" not in result_query_tags:
                 if not any(token in response_text for token in GREETING_HINTS):
-                    score -= 0.1
+                    score -= _RERANK_NO_GREETING_HINT_PENALTY
 
+            # ---- noise result ----
             if normalized_result_query in {"……", "……（咽口水）……", "………………"}:
-                score -= 0.3
+                score -= _RERANK_NOISE_RESULT_PENALTY
 
+            # ---- post-filter positive bonuses ----
             if "comfort" in query_tags and any(
                 token in response_text for token in SUPPORTIVE_HINTS
             ):
-                score += 0.08
+                score += _RERANK_COMFORT_BONUS
             if "greeting" in query_tags and any(
                 token in response_text for token in GREETING_HINTS
             ):
-                score += 0.08
+                score += _RERANK_GREETING_BONUS
             if "gratitude" in query_tags and any(
                 token in response_text for token in GRATITUDE_HINTS
             ):
-                score += 0.06
+                score += _RERANK_GRATITUDE_BONUS
             if "relationship" in query_tags and any(
                 token in response_text for token in ROMANCE_HINTS
             ):
-                score += 0.06
+                score += _RERANK_RELATIONSHIP_BONUS
             if "witch" in query_tags and any(token in combined_text for token in WITCH_HINTS):
-                score += 0.1
+                score += _RERANK_WITCH_BONUS
             if ("club" in query_tags or "divination" in query_tags) and any(
                 token in combined_text for token in CLUB_HINTS
             ):
-                score += 0.08
+                score += _RERANK_CLUB_BONUS
 
             reranked.append(
                 {
@@ -298,7 +376,7 @@ class RAGPipeline:
         )
         return reranked
 
-    def retrieve_and_filter(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
+    def retrieve_and_filter(self, query: str, top_k: int = 3) -> list[dict[str, Any]]:
         """Embed query, search FAISS, keep results above cosine threshold."""
         with traced_span(
             "rag.retrieve",
@@ -343,10 +421,10 @@ class RAGPipeline:
     def build_messages(
         self,
         query: str,
-        context_results: List[Dict[str, Any]],
-        history: Optional[List[Dict[str, str]]] = None,
+        context_results: list[dict[str, Any]],
+        history: list[dict[str, str]] | None = None,
         response_language: str = "zh",
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """Assemble the ChatML messages list for /api/chat.
 
         Structure:
@@ -380,7 +458,7 @@ class RAGPipeline:
         system_sections.append(rag_block)
         system_content = "\n\n".join(system_sections)
 
-        messages: List[Dict[str, str]] = [{"role": "system", "content": system_content}]
+        messages: list[dict[str, str]] = [{"role": "system", "content": system_content}]
         if history:
             messages.extend(history)
         messages.append({"role": "user", "content": query})
@@ -394,9 +472,9 @@ class RAGPipeline:
         self,
         query: str,
         top_k: int = 3,
-        history: Optional[List[Dict[str, str]]] = None,
+        history: list[dict[str, str]] | None = None,
         response_language: str = "zh",
-    ) -> Tuple[List[Dict[str, str]], List[Dict[str, Any]]]:
+    ) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
         """Returns (messages_for_llm, filtered_contexts)."""
         contexts = self.retrieve_and_filter(query, top_k)
         messages = self.build_messages(

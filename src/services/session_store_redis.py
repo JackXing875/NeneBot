@@ -1,8 +1,9 @@
 """Redis-backed session storage for production use."""
 
+from __future__ import annotations
+
 import json
 import uuid
-from typing import List
 
 from redis import Redis
 
@@ -36,7 +37,7 @@ class RedisSessionStore:
     def get_or_create(self, session_id: str | None) -> str:
         return session_id if session_id else str(uuid.uuid4())
 
-    def get_history(self, session_id: str) -> List[ChatMessage]:
+    def get_history(self, session_id: str) -> list[ChatMessage]:
         raw = self.client.get(self._key(session_id))
         if not raw:
             return []

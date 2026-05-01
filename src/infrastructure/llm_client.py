@@ -1,8 +1,10 @@
 """Async Ollama client using /api/chat with streaming support."""
 
+from __future__ import annotations
+
 import json
 import logging
-from typing import AsyncIterator, Dict, List
+from typing import AsyncIterator
 
 import httpx
 
@@ -21,11 +23,14 @@ class OllamaClient(BaseLLMClient):
     def __init__(self) -> None:
         self.chat_endpoint = f"{settings.ollama_base_url}/api/chat"
         self.model_name = settings.llm_model_name
-        self._options = {"temperature": 0.7, "top_p": 0.9}
+        self._options = {
+            "temperature": settings.llm_temperature_ollama,
+            "top_p": settings.llm_top_p_ollama,
+        }
         logger.info(f"OllamaClient initialized: model={self.model_name}")
 
     async def chat_stream(
-        self, messages: List[Dict[str, str]]
+        self, messages: list[dict[str, str]]
     ) -> AsyncIterator[str]:
         """Yields response content chunks from Ollama's streaming API."""
         async def stream_factory() -> AsyncIterator[str]:

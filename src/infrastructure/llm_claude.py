@@ -1,7 +1,9 @@
 """Claude API client (via Anthropic SDK)."""
 
+from __future__ import annotations
+
 import logging
-from typing import AsyncIterator, Dict, List, cast
+from typing import AsyncIterator, List, cast
 
 import anthropic
 from anthropic.types import MessageParam
@@ -28,11 +30,11 @@ class ClaudeClient(BaseLLMClient):
         logger.info(f"ClaudeClient initialized with model={self.model}")
 
     async def chat_stream(
-        self, messages: List[Dict[str, str]]
+        self, messages: list[dict[str, str]]
     ) -> AsyncIterator[str]:
         async def stream_factory() -> AsyncIterator[str]:
             system_content = ""
-            chat_messages: List[Dict[str, str]] = []
+            chat_messages: list[dict[str, str]] = []
             for msg in messages:
                 if msg["role"] == "system":
                     system_content = msg["content"]
@@ -41,10 +43,10 @@ class ClaudeClient(BaseLLMClient):
 
             async with self._client.messages.stream(
                 model=self.model,
-                max_tokens=512,
+                max_tokens=settings.llm_max_tokens_claude,
                 system=system_content,
                 messages=cast(List[MessageParam], chat_messages),
-                temperature=1.0,  # anthropic sdk controls creativity differently
+                temperature=settings.llm_temperature_claude,
             ) as stream:
                 async for text in stream.text_stream:
                     yield text
