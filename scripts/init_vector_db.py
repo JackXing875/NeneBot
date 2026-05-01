@@ -30,7 +30,7 @@ def load_jsonl_data(file_path: str) -> List[Dict[str, Any]]:
     Returns:
         A list of dictionaries representing each line in the JSONL file.
     """
-    data = []
+    data: list[dict[str, Any]] = []
     if not os.path.exists(file_path):
         logger.error(f"Dataset file not found at: {file_path}")
         return data

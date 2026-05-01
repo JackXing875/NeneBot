@@ -2,12 +2,13 @@
 
 import time
 from collections import defaultdict, deque
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import DefaultDict
 
 from fastapi import Request
 from fastapi.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
 
 from src.core.config import settings
 from src.core.exceptions import RateLimitExceededError
@@ -41,14 +42,14 @@ class InMemoryRateLimiter:
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Apply in-memory rate limiting to selected API paths."""
 
-    def __init__(self, app, limiter: InMemoryRateLimiter) -> None:
+    def __init__(self, app: ASGIApp, limiter: InMemoryRateLimiter) -> None:
         super().__init__(app)
         self.limiter = limiter
 
     async def dispatch(
         self,
         request: Request,
-        call_next: Callable[[Request], Response],
+        call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         if request.url.path.startswith("/v1/"):
             key = request.client.host if request.client else "unknown"

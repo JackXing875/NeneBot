@@ -48,7 +48,7 @@ def setup_tracing() -> None:
     _TRACING_INITIALIZED = True
 
 
-def _current_tracer():
+def _current_tracer() -> Any:
     if not settings.tracing_enabled or not OTEL_AVAILABLE:
         return None
     setup_tracing()

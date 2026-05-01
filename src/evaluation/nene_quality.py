@@ -7,7 +7,7 @@ import json
 import re
 from pathlib import Path
 from statistics import mean
-from typing import Any
+from typing import Any, cast
 
 from src.evaluation.nene_benchmark_cases import BENCHMARK_CASES
 from src.infrastructure.llm_base import BaseLLMClient
@@ -38,8 +38,10 @@ def score_retrieval_hit(case: dict[str, object], top1: dict[str, Any]) -> tuple[
     haystack = f"{top1_query}\n{top1_response}"
     hit_tags = set(top1.get("query_tags", [])) | set(top1.get("response_tags", []))
 
-    required_tokens = [str(item) for item in case.get("must_include_any", [])]
-    preferred_tokens = [str(item) for item in case.get("prefer_include_any", [])]
+    required_tokens = [str(item) for item in cast("list[object]", case.get("must_include_any", []))]
+    preferred_tokens = [
+        str(item) for item in cast("list[object]", case.get("prefer_include_any", []))
+    ]
     if required_tokens and not any(token in haystack for token in required_tokens):
         score -= 30
         penalties.append("missed_required_signal")
@@ -262,12 +264,16 @@ def score_reply(reply: str, case: dict[str, object]) -> dict[str, Any]:
         score -= 10
         penalties.append("too_long")
 
-    must_include_any = [str(item) for item in case.get("must_include_any", [])]
+    must_include_any = [
+        str(item) for item in cast("list[object]", case.get("must_include_any", []))
+    ]
     if must_include_any and not any(token in reply for token in must_include_any):
         score -= 15
         penalties.append("missed_required_signal")
 
-    prefer_include_any = [str(item) for item in case.get("prefer_include_any", [])]
+    prefer_include_any = [
+        str(item) for item in cast("list[object]", case.get("prefer_include_any", []))
+    ]
     if prefer_include_any and not any(token in reply for token in prefer_include_any):
         score -= 5
         penalties.append("missed_preferred_signal")

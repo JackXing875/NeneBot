@@ -95,7 +95,9 @@ async def with_retries(
             raise LLMTimeoutError() from last_error
         llm_failures_total.inc(provider_name=provider_name, reason="unavailable")
         set_span_attributes(span, llm_outcome="unavailable")
-        raise LLMProviderUnavailableError(str(last_error) if last_error else None) from last_error
+        raise LLMProviderUnavailableError(
+            str(last_error) if last_error else "LLM provider unavailable."
+        ) from last_error
 
 
 async def resilient_stream(
