@@ -182,9 +182,27 @@ def run_dev(args: argparse.Namespace) -> int:
             cwd=str(PROJECT_ROOT),
         )
         children.append(backend)
-        time.sleep(2)
-        if backend.poll() is not None:
-            return int(backend.returncode or 1)
+
+        # Poll the health endpoint instead of a blind sleep
+        deadline = time.time() + 15
+        backend_ready = False
+        while time.time() < deadline:
+            if backend.poll() is not None:
+                return int(backend.returncode or 1)
+            try:
+                with urllib.request.urlopen(
+                    f"http://{args.host}:{args.port}/health/live", timeout=1
+                ) as resp:
+                    if 200 <= resp.status < 500:
+                        backend_ready = True
+                        break
+            except (urllib.error.URLError, TimeoutError, ValueError):
+                pass
+            time.sleep(0.5)
+
+        if not backend_ready:
+            print("Backend failed to start within 15 seconds.")
+            return 1
 
         frontend = subprocess.Popen(
             choose_frontend_command(frontend_dir, port=args.frontend_port),

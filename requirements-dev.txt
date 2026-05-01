@@ -2,3 +2,6 @@
 pytest>=8.3.0
 fakeredis>=2.31.0
 ruff==0.15.4
+mypy
+opentelemetry-api>=1.28.0
+opentelemetry-sdk>=1.28.0

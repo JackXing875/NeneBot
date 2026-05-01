@@ -71,13 +71,7 @@ def build_health_payload(
     session_backend_error: str | None = None,
 ) -> dict[str, object]:
     """Build the standard health payload returned by `/health`."""
-    llm_model = (
-        settings.claude_model_name
-        if settings.llm_provider == "claude"
-        else settings.openai_compat_model
-        if settings.llm_provider in ("deepseek", "openai")
-        else settings.llm_model_name
-    )
+    llm_model = settings.effective_llm_model
     vector_index_exists = Path(vector_store.index_path).exists()
     knowledge_meta_exists = Path(vector_store.meta_path).exists()
     ready = session_backend_ok and vector_index_exists and knowledge_meta_exists

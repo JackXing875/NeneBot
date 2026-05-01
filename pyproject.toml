@@ -1,6 +1,6 @@
 [project]
 name = "nenebot"
-version = "0.6.0b1"
+version = "0.7.0b1"
 description = "RAG-powered conversational AI engine featuring Ayachi Nene"
 authors = [
     { name = "Jack Xing", email = "xjack875@gmail.com" }

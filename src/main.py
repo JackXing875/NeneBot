@@ -73,7 +73,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -93,7 +93,7 @@ def create_app() -> FastAPI:
     async def health_check(_: None = Depends(require_api_scope("ops"))) -> dict[str, object]:
         vs: FaissVectorStore = app.state.vector_store
         session_store: SessionStore = app.state.session_store
-        frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+        frontend_dist = Path(settings.frontend_dist_dir)
         session_ok, session_error = check_session_backend(session_store)
         return build_health_payload(
             vector_store=vs,
@@ -135,7 +135,7 @@ def create_app() -> FastAPI:
 
     # Serve compiled Vue frontend if the dist directory exists.
     # In production (Railway), the build step creates frontend/dist before uvicorn starts.
-    frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+    frontend_dist = Path(settings.frontend_dist_dir)
     if frontend_dist.exists():
         @app.get("/admin", include_in_schema=False)
         async def admin_console(_: None = Depends(require_api_scope("ops"))) -> FileResponse:

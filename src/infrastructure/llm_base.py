@@ -1,7 +1,9 @@
 """Abstract base class for all LLM clients."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import AsyncIterator, Dict, List
+from typing import AsyncIterator
 
 
 class BaseLLMClient(ABC):
@@ -13,14 +15,14 @@ class BaseLLMClient(ABC):
 
     @abstractmethod
     def chat_stream(
-        self, messages: List[Dict[str, str]]
+        self, messages: list[dict[str, str]]
     ) -> AsyncIterator[str]:
         """Yield response tokens one by one."""
         ...
 
-    async def chat(self, messages: List[Dict[str, str]]) -> str:
+    async def chat(self, messages: list[dict[str, str]]) -> str:
         """Collect all streamed tokens into a single string."""
-        chunks: List[str] = []
+        chunks: list[str] = []
         async for chunk in self.chat_stream(messages):
             chunks.append(chunk)
         return "".join(chunks)

@@ -1,7 +1,9 @@
 """OpenAI-compatible API client (DeepSeek, Qwen-API, etc.)."""
 
+from __future__ import annotations
+
 import logging
-from typing import AsyncIterator, Dict, List, cast
+from typing import AsyncIterator, List, cast
 
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
@@ -34,15 +36,15 @@ class OpenAICompatClient(BaseLLMClient):
         )
 
     async def chat_stream(
-        self, messages: List[Dict[str, str]]
+        self, messages: list[dict[str, str]]
     ) -> AsyncIterator[str]:
         async def stream_factory() -> AsyncIterator[str]:
             stream = await self._client.chat.completions.create(
                 model=self.model,
                 messages=cast(List[ChatCompletionMessageParam], messages),
                 stream=True,
-                temperature=0.7,
-                max_tokens=512,
+                temperature=settings.llm_temperature_openai,
+                max_tokens=settings.llm_max_tokens_openai,
                 timeout=settings.llm_timeout_seconds,
             )
             async for chunk in stream:

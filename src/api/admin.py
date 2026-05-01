@@ -29,7 +29,12 @@ admin_router = APIRouter(
 
 
 class KnowledgeImportRequest(BaseModel):
-    content: str = Field(..., min_length=1, description="JSONL dataset content.")
+    content: str = Field(
+        ...,
+        min_length=1,
+        max_length=settings.max_knowledge_import_bytes,
+        description="JSONL dataset content (max 2 MiB by default).",
+    )
     rebuild: bool = Field(
         True,
         description="Whether to rebuild the vector index immediately after import.",
@@ -82,7 +87,7 @@ async def admin_overview(request: Request) -> dict[str, object]:
     app = request.app
     vector_store: FaissVectorStore = app.state.vector_store
     session_store: SessionStore = app.state.session_store
-    frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    frontend_dist = Path(settings.frontend_dist_dir)
     session_ok, session_error = check_session_backend(session_store)
 
     health = build_health_payload(
@@ -93,13 +98,7 @@ async def admin_overview(request: Request) -> dict[str, object]:
         session_backend_error=session_error,
     )
 
-    provider_model = (
-        settings.claude_model_name
-        if settings.llm_provider == "claude"
-        else settings.openai_compat_model
-        if settings.llm_provider in ("deepseek", "openai")
-        else settings.llm_model_name
-    )
+    provider_model = settings.effective_llm_model
 
     return {
         "service": {

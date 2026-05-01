@@ -13,19 +13,33 @@ Set the LLM_PROVIDER environment variable to switch backends:
     LLM_PROVIDER=openai    → Any OpenAI-compatible endpoint
 """
 
+from __future__ import annotations
+
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+LLMProvider = Literal["ollama", "claude", "deepseek", "openai"]
 
 
 def resolve_env_files() -> tuple[str, ...]:
     """Return layered env files based on APP_ENV."""
     app_env = os.getenv("APP_ENV", "dev").strip().lower() or "dev"
     return (".env", f".env.{app_env}")
+
+
+def resolve_llm_model_name() -> str:
+    """Resolve the effective model name for the active LLM provider."""
+    provider = os.getenv("LLM_PROVIDER", "ollama").strip().lower() or "ollama"
+    if provider == "claude":
+        return os.getenv("CLAUDE_MODEL_NAME", "claude-haiku-4-5-20251001")
+    if provider in ("deepseek", "openai"):
+        return os.getenv("OPENAI_COMPAT_MODEL", "deepseek-chat")
+    return os.getenv("LLM_MODEL_NAME", "qwen2.5")
 
 
 class Settings(BaseSettings):
@@ -40,35 +54,44 @@ class Settings(BaseSettings):
 
     # --- API ---
     api_title: str = "NeneBot API"
-    api_version: str = "0.6.0b1"
+    api_version: str = "0.7.0b1"
     host: str = "0.0.0.0"
     port: int = 8000  # Overridden by PORT env var on Railway
+    cors_allow_origins: str = "*"  # Comma-separated origins or "*" for all
+    max_knowledge_import_bytes: int = 2_097_152  # 2 MiB limit for knowledge import
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
     # --- Embedding Model ---
     embedding_model_name: str = "BAAI/bge-small-zh-v1.5"
     vector_dim: int = 512
 
     # --- LLM Provider ---
-    # One of: "ollama" | "claude" | "deepseek" | "openai"
-    llm_provider: str = "ollama"
+    llm_provider: LLMProvider = "ollama"
 
     # Ollama (local dev)
     ollama_base_url: str = "http://127.0.0.1:11434"
     llm_model_name: str = "qwen2.5"
+    llm_temperature_ollama: float = 0.7
+    llm_top_p_ollama: float = 0.9
 
     # Claude (Anthropic)
     anthropic_api_key: Optional[str] = None
     claude_model_name: str = "claude-haiku-4-5-20251001"
+    llm_temperature_claude: float = 1.0
+    llm_max_tokens_claude: int = 512
 
     # OpenAI-compatible (DeepSeek / Qwen-API / etc.)
     openai_compat_api_key: Optional[str] = None
     openai_compat_base_url: str = "https://api.deepseek.com"
     openai_compat_model: str = "deepseek-chat"
+    llm_temperature_openai: float = 0.7
+    llm_max_tokens_openai: int = 512
 
     # --- Storage Paths ---
     data_path: str = str(PROJECT_ROOT / "data" / "raw" / "train.jsonl")
     vector_index_path: str = str(PROJECT_ROOT / "vector_store" / "faiss_index.bin")
     knowledge_meta_path: str = str(PROJECT_ROOT / "vector_store" / "knowledge_base.json")
+    frontend_dist_dir: str = str(PROJECT_ROOT / "frontend" / "dist")
 
     # --- RAG ---
     match_threshold: float = 0.55  # Cosine similarity cutoff (0–1)
@@ -101,5 +124,23 @@ class Settings(BaseSettings):
     telegram_webhook_path: str = "/integrations/telegram/webhook"
     telegram_webhook_secret: Optional[str] = None
     telegram_public_base_url: Optional[str] = None
+
+    @property
+    def effective_llm_model(self) -> str:
+        """Return the resolved model name for the active provider."""
+        if self.llm_provider == "claude":
+            return self.claude_model_name
+        if self.llm_provider in ("deepseek", "openai"):
+            return self.openai_compat_model
+        return self.llm_model_name
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Parse CORS origins into a list for starlette middleware."""
+        raw = self.cors_allow_origins.strip()
+        if raw == "*":
+            return ["*"]
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
 
 settings = Settings()
