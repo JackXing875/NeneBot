@@ -39,7 +39,7 @@ class RedisSessionStore:
 
     def get_history(self, session_id: str) -> list[ChatMessage]:
         raw = self.client.get(self._key(session_id))
-        if not raw or not isinstance(raw, str):
+        if not raw or not isinstance(raw, (str, bytes, bytearray)):
             return []
         loaded = json.loads(raw)
         return loaded if isinstance(loaded, list) else []
