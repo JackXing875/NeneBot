@@ -14,9 +14,7 @@ class BaseLLMClient(ABC):
     """
 
     @abstractmethod
-    def chat_stream(
-        self, messages: list[dict[str, str]]
-    ) -> AsyncIterator[str]:
+    def chat_stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
         """Yield response tokens one by one."""
         ...
 

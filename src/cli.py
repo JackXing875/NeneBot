@@ -204,7 +204,7 @@ def run_dev(args: argparse.Namespace) -> int:
                 return int(backend.returncode or 1)
             try:
                 with urllib.request.urlopen(
-                    f"http://{args.host}:{args.port}/health/live", timeout=1
+                    f"http://{args.host}:{args.port}/livez", timeout=1
                 ) as resp:
                     if 200 <= resp.status < 500:
                         backend_ready = True

@@ -1,3 +1,5 @@
+import asyncio
+
 from starlette.requests import Request
 
 from src.core.auth import require_api_scope
@@ -30,7 +32,7 @@ def test_admin_ops_scope_rejects_missing_token(monkeypatch) -> None:
     request = make_request()
 
     try:
-        require_api_scope("ops")(request)
+        asyncio.run(require_api_scope("ops")(request))
     except AuthenticationError as exc:
         assert exc.code == "auth_required"
         assert exc.status_code == 401
@@ -46,7 +48,7 @@ def test_admin_ops_scope_rejects_chat_only_token(monkeypatch) -> None:
     request = make_request([(b"authorization", b"Bearer chat-token")])
 
     try:
-        require_api_scope("ops")(request)
+        asyncio.run(require_api_scope("ops")(request))
     except AuthorizationError as exc:
         assert exc.code == "forbidden"
         assert exc.status_code == 403

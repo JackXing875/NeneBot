@@ -107,9 +107,7 @@ class FaissVectorStore(BaseVectorStore):
         self._save()
         return True
 
-    def search(
-        self, query_embedding: List[float], top_k: int = 3
-    ) -> List[Dict[str, Any]]:
+    def search(self, query_embedding: List[float], top_k: int = 3) -> List[Dict[str, Any]]:
         if self.index.ntotal == 0:
             return []
 

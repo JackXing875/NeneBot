@@ -1,7 +1,7 @@
 # ==========================================
 # Stage 1: Frontend builder
 # ==========================================
-FROM node:20-slim AS frontend-builder
+FROM node:22-slim AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -57,5 +57,9 @@ USER appuser
 
 EXPOSE 8000
 
-# Build vector index on first run if not present, then start API server
-CMD ["sh", "-c", "python scripts/init_vector_db.py || true && uvicorn src.main:app --host 0.0.0.0 --port 8000"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=120s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/livez', timeout=2)"
+
+# Runtime startup owns validation of the configured knowledge artifact. Do not
+# rebuild it unconditionally or hide build failures before starting the server.
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]

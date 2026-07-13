@@ -131,10 +131,7 @@ def promote_dataset(
         result["destination_after"] = validate_dataset_file(destination)
 
         if rebuild:
-            try:
-                from scripts.init_vector_db import main as rebuild_index  # type: ignore[import]
-            except ModuleNotFoundError:
-                from init_vector_db import main as rebuild_index  # type: ignore[import]
+            from scripts.init_vector_db import main as rebuild_index
 
             rebuild_index()
             result["rebuild_triggered"] = True

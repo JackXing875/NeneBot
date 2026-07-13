@@ -136,6 +136,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/
@@ -215,15 +217,16 @@ venv/
 env/
 .env
 
-# Vector store files
+# Runtime state and generated/private datasets
 /vector_store/
 !src/infrastructure/vector_store/
 !src/infrastructure/vector_store/*.py
-*.jsonl
-*.json
-*.bin
-*.csv
-!data/raw/train.jsonl
+/config/api_tokens.json
+/data/backups/
+/data/processed/
+/data/raw/nene_finetune.jsonl
+/data/raw/nene_ks_*.json
+/data/raw/nene_ks_*.jsonl
 
 # Model files
 models/

@@ -30,9 +30,7 @@ DEFAULT_SAFE_OUTPUT = PROJECT_ROOT / "data" / "raw" / "nene_ks_safe.jsonl"
 DEFAULT_REVIEW_OUTPUT = PROJECT_ROOT / "data" / "raw" / "nene_ks_review.jsonl"
 DEFAULT_REPORT_OUTPUT = PROJECT_ROOT / "data" / "raw" / "nene_ks_report.json"
 
-LINE_RE = re.compile(
-    r"^(?P<comment>;)?\[(?P<idx>0x[0-9A-Fa-f]+)\](?P<text>.*)$"
-)
+LINE_RE = re.compile(r"^(?P<comment>;)?\[(?P<idx>0x[0-9A-Fa-f]+)\](?P<text>.*)$")
 CONTROL_PREFIX_RE = re.compile(r"^%[^;]+;")
 SPEAKER_RE = re.compile(
     r"^[A-Za-z0-9_ぁ-ゟァ-ヴー一-龯々ヶ・ＣＡＢ女子学生保科君柊史寧々宁宁綾地さん]+$"

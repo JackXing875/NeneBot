@@ -12,8 +12,6 @@ from sentence_transformers import SentenceTransformer
 
 from src.core.config import settings
 
-# Configure basic logging for the service
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

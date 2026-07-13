@@ -50,7 +50,7 @@ def create_llm_client() -> BaseLLMClient:
 
 
 def create_session_store() -> SessionStore:
-    """Create the configured session backend with a safe in-memory fallback."""
+    """Create the session backend, failing closed in production."""
     backend = settings.session_backend.lower()
     if backend == "redis":
         try:
@@ -63,7 +63,15 @@ def create_session_store() -> SessionStore:
             logger.info("Session backend: redis")
             return store
         except Exception as exc:
-            logger.warning(f"Redis session store unavailable, falling back to memory: {exc}")
+            if settings.app_env == "prod":
+                raise RuntimeError(
+                    "The required Redis session backend is unavailable in production."
+                ) from exc
+            logger.warning(
+                "Redis session store unavailable; using process-local memory in %s (%s).",
+                settings.app_env,
+                type(exc).__name__,
+            )
 
     logger.info("Session backend: memory")
     return InMemorySessionStore(max_history=settings.session_max_history)
@@ -83,12 +91,18 @@ def check_session_backend(store: SessionStore) -> tuple[bool, str | None]:
 
 
 def ensure_index_exists() -> None:
-    """Build the FAISS vector index on first run."""
+    """Require a prebuilt index outside development and test environments."""
     index_path = Path(settings.vector_index_path)
     meta_path = Path(settings.knowledge_meta_path)
 
     if index_path.exists() and meta_path.exists():
         return
+
+    if settings.app_env in {"staging", "prod"}:
+        raise RuntimeError(
+            "The configured knowledge artifact is missing. Build and publish it offline "
+            "before starting a staging or production runtime."
+        )
 
     logger.info("Vector index not found – building from scratch (this may take a minute)...")
     from scripts.init_vector_db import main as build_index

@@ -56,9 +56,9 @@ _CHARACTER_CARD = """\
 3. 不直接照搬【参考样本】原句，只学习语气、关系感和措辞倾向
 4. 如果样本和当前问题无关，忽略样本内容，只保留宁宁的人格与口吻
 5. 不主动暴露自己"魔女"的秘密身份，除非用户上下文已经明确谈到该设定
-6. 当用户表达烦恼、疲惫或失落时，优先给予温柔、可信、具体的回应\
+6. 当用户表达烦恼、疲惫或失落时，优先给予温柔、可信、具体的回应
 7. 任何时候都以【角色设定】为最高优先级；如果参考样本与角色设定冲突，以角色设定为准
-8. 不要擅自编造学校、职务、社团、经历等事实性设定；拿不准时宁可少说，也不要说错\
+8. 不要擅自编造学校、职务、社团、经历等事实性设定；拿不准时宁可少说，也不要说错
 """
 
 
@@ -228,9 +228,7 @@ class RAGPipeline:
         retrieve_and_filter() → build_messages() → [LLM call in router]
     """
 
-    def __init__(
-        self, vector_store: FaissVectorStore, embedding_svc: EmbeddingService
-    ) -> None:
+    def __init__(self, vector_store: FaissVectorStore, embedding_svc: EmbeddingService) -> None:
         self.vector_store = vector_store
         self.embedding_svc = embedding_svc
         self.match_threshold: float = settings.match_threshold
@@ -310,9 +308,7 @@ class RAGPipeline:
                 if not any(token in combined_text for token in WITCH_HINTS):
                     score -= _RERANK_NO_WITCH_HINT_PENALTY
                 if query_text.endswith("吧？") or query_text.endswith("吗？") or "是不是" in query:
-                    if any(
-                        token in combined_text for token in ("保密", "外传", "不能说")
-                    ):
+                    if any(token in combined_text for token in ("保密", "外传", "不能说")):
                         score += _RERANK_WITCH_SECRET_BONUS
                     elif "魔女" in combined_text and "保密" not in combined_text:
                         score -= _RERANK_WITCH_NO_SECRET_PENALTY
@@ -341,9 +337,7 @@ class RAGPipeline:
                 token in response_text for token in SUPPORTIVE_HINTS
             ):
                 score += _RERANK_COMFORT_BONUS
-            if "greeting" in query_tags and any(
-                token in response_text for token in GREETING_HINTS
-            ):
+            if "greeting" in query_tags and any(token in response_text for token in GREETING_HINTS):
                 score += _RERANK_GREETING_BONUS
             if "gratitude" in query_tags and any(
                 token in response_text for token in GRATITUDE_HINTS
@@ -389,8 +383,7 @@ class RAGPipeline:
             search_k = max(top_k * 5, 12)
             raw = self.vector_store.search(query_embedding, top_k=search_k)
             filtered = [r for r in raw if r.get("similarity_score", 0.0) >= self.match_threshold]
-            reranked_pool = filtered if filtered else raw
-            final_results = self._rerank_contexts(query, reranked_pool)[:top_k]
+            final_results = self._rerank_contexts(query, filtered)[:top_k]
             duration_ms = round(now_ms() - started_at, 2)
             rag_retrieval_total.inc(top_k=str(top_k))
             rag_retrieval_duration_ms.observe(duration_ms, top_k=str(top_k))

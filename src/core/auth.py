@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 from secrets import compare_digest
@@ -99,7 +99,13 @@ def configured_auth_identities() -> list[AuthIdentity]:
 
 
 def auth_enabled() -> bool:
-    return settings.api_auth_enabled and bool(configured_auth_identities())
+    """Return whether authentication enforcement was explicitly enabled.
+
+    Configuration completeness must not influence this result: when auth is
+    enabled without any usable identities, requests are rejected rather than
+    silently falling back to unauthenticated access.
+    """
+    return settings.api_auth_enabled
 
 
 def extract_api_token(request: Request) -> str | None:
@@ -114,12 +120,6 @@ def extract_api_token(request: Request) -> str | None:
         return x_api_key.strip() or None
 
     return None
-
-
-def token_subject(token: str) -> str:
-    if len(token) <= 8:
-        return token
-    return f"{token[:4]}...{token[-4:]}"
 
 
 def validate_api_token(token: str | None) -> AuthIdentity | None:
@@ -143,14 +143,16 @@ def require_api_auth(request: Request) -> None:
         raise AuthenticationError()
 
     request.state.auth_subject = matched.name
-    request.state.auth_token_preview = token_subject(matched.token)
     request.state.auth_scopes = sorted(matched.scopes)
 
 
-def require_api_scope(scope: str) -> Callable[[Request], None]:
+def require_api_scope(scope: str) -> Callable[[Request], Awaitable[None]]:
     """Return a FastAPI dependency that enforces auth plus a named scope."""
 
-    def _dependency(request: Request) -> None:
+    async def _dependency(request: Request) -> None:
+        if not auth_enabled():
+            return
+
         require_api_auth(request)
         scopes = set(getattr(request.state, "auth_scopes", []))
         if scope not in scopes:

@@ -29,6 +29,19 @@ class DummyVectorStore:
         return self.results[:top_k]
 
 
+class LowScoreVectorStore:
+    def search(self, query_embedding, top_k=3):  # type: ignore[no-untyped-def]
+        return [
+            {
+                "query_text": "完全无关的问题",
+                "bot_response": "不应该进入提示词的低分答案",
+                "similarity_score": 0.2,
+                "query_tags": [],
+                "response_tags": [],
+            }
+        ]
+
+
 def test_rag_pipeline_reranks_by_intent_and_response_quality() -> None:
     pipeline = RAGPipeline(
         vector_store=DummyVectorStore(),  # type: ignore[arg-type]
@@ -40,6 +53,17 @@ def test_rag_pipeline_reranks_by_intent_and_response_quality() -> None:
     assert len(results) == 1
     assert results[0]["bot_response"] == "如果累了的话，就先休息一下吧，保科君。"
     assert results[0]["rerank_score"] > 0.79
+
+
+def test_rag_pipeline_returns_no_context_below_similarity_threshold() -> None:
+    pipeline = RAGPipeline(
+        vector_store=LowScoreVectorStore(),  # type: ignore[arg-type]
+        embedding_svc=DummyEmbeddingService(),  # type: ignore[arg-type]
+    )
+
+    results = pipeline.retrieve_and_filter("今天有点累", top_k=1)
+
+    assert results == []
 
 
 class RelationshipNoiseVectorStore:
@@ -58,8 +82,7 @@ class RelationshipNoiseVectorStore:
             {
                 "query_text": "你会不会也有一点在意我",
                 "bot_response": (
-                    "那个……突然这么问，我会有点困扰。"
-                    "不过，如果对象是保科君的话，我当然会在意。"
+                    "那个……突然这么问，我会有点困扰。不过，如果对象是保科君的话，我当然会在意。"
                 ),
                 "similarity_score": 0.72,
                 "query_tags": ["relationship", "shy"],
@@ -84,8 +107,7 @@ class WitchIntentVectorStore:
             {
                 "query_text": "你是不是魔女",
                 "bot_response": (
-                    "那个……现在突然问这个，我有点不知道该怎么回答。"
-                    "不过，这件事还请先替我保密。"
+                    "那个……现在突然问这个，我有点不知道该怎么回答。不过，这件事还请先替我保密。"
                 ),
                 "similarity_score": 0.72,
                 "query_tags": ["witch", "shy"],

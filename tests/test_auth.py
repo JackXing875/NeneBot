@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 from starlette.requests import Request
@@ -7,7 +8,6 @@ from src.core.auth import (
     extract_api_token,
     require_api_auth,
     require_api_scope,
-    token_subject,
     validate_api_token,
 )
 from src.core.config import settings
@@ -99,6 +99,51 @@ def test_require_api_auth_rejects_missing_token(monkeypatch) -> None:
         raise AssertionError("AuthenticationError was not raised")
 
 
+def test_require_api_auth_rejects_when_enabled_without_identities(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "api_auth_enabled", True)
+    monkeypatch.setattr(settings, "api_auth_tokens", "")
+    monkeypatch.setattr(settings, "api_auth_registry_path", "/tmp/does-not-exist.json")
+
+    request = make_request([(b"authorization", b"Bearer unconfigured-token")])
+
+    try:
+        require_api_auth(request)
+    except AuthenticationError as exc:
+        assert exc.code == "auth_required"
+        assert exc.status_code == 401
+    else:
+        raise AssertionError("AuthenticationError was not raised")
+
+
+def test_require_api_scope_rejects_when_enabled_without_identities(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "api_auth_enabled", True)
+    monkeypatch.setattr(settings, "api_auth_tokens", "")
+    monkeypatch.setattr(settings, "api_auth_registry_path", "/tmp/does-not-exist.json")
+
+    request = make_request()
+
+    try:
+        asyncio.run(require_api_scope("chat")(request))
+    except AuthenticationError as exc:
+        assert exc.code == "auth_required"
+        assert exc.status_code == 401
+    else:
+        raise AssertionError("AuthenticationError was not raised")
+
+
+def test_require_api_scope_allows_requests_when_auth_is_disabled(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "api_auth_enabled", False)
+    monkeypatch.setattr(settings, "api_auth_tokens", "")
+    monkeypatch.setattr(settings, "api_auth_registry_path", "/tmp/does-not-exist.json")
+
+    request = make_request()
+
+    asyncio.run(require_api_scope("ops")(request))
+
+    assert not hasattr(request.state, "auth_subject")
+    assert not hasattr(request.state, "auth_scopes")
+
+
 def test_require_api_auth_sets_audit_subject(monkeypatch) -> None:
     monkeypatch.setattr(settings, "api_auth_enabled", True)
     monkeypatch.setattr(settings, "api_auth_tokens", "ci-bot|chat:secret-token")
@@ -108,8 +153,8 @@ def test_require_api_auth_sets_audit_subject(monkeypatch) -> None:
     require_api_auth(request)
 
     assert request.state.auth_subject == "ci-bot"
-    assert request.state.auth_token_preview == token_subject("secret-token")
     assert request.state.auth_scopes == ["chat"]
+    assert not hasattr(request.state, "auth_token_preview")
 
 
 def test_require_api_scope_rejects_missing_scope(monkeypatch) -> None:
@@ -119,7 +164,7 @@ def test_require_api_scope_rejects_missing_scope(monkeypatch) -> None:
     request = make_request([(b"authorization", b"Bearer secret-token")])
 
     try:
-        require_api_scope("ops")(request)
+        asyncio.run(require_api_scope("ops")(request))
     except AuthorizationError as exc:
         assert exc.code == "forbidden"
         assert exc.status_code == 403

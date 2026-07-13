@@ -1,528 +1,185 @@
+# Persona Studio
 
-<div align="center">
+> NeneBot 0.7 migration preview — a local-first, auditable Character Agent Studio and
+> Runtime.
 
+[中文说明](README_ch.md) · [Migration roadmap](MEMORY.md) ·
+[Character Pack v1](docs/character-packs.md)
 
-# NeneBot: A RAG-Powered Ayachi Nene AI Companion
+This repository is being rebuilt from a single-character RAG demo into a general platform for
+authoring, validating, testing, and running character agents. The migration is incremental: the
+0.7 branch still runs the compatibility application while new content and runtime boundaries are
+introduced alongside it.
 
- <div>&nbsp;</div>
+## What exists today
 
-<img src="assets/nene.gif" width="300" alt="Ayachi Nene">
+The following describes the current 0.7 compatibility runtime, not the finished Studio:
 
- <div>&nbsp;</div>
+- a FastAPI backend with the legacy `POST /v1/chat` and `POST /v1/chat/stream` APIs;
+- incremental SSE output, request limits, scoped token authentication, and operational probes;
+- a Vue/Vite chat client and an operations-oriented admin page;
+- Ollama, Anthropic, and OpenAI-compatible LLM adapters;
+- the legacy FAISS/sentence-transformers retrieval pipeline;
+- process-local session history by default, with Redis as an optional backend;
+- strict Character Pack JSON v1 validation and immutable Artifact staging/publishing helpers.
 
-<p align="center">
-  <b>A RAG-Powered Conversational AI for Ayachi Nene </b><br>
-  <i>"メンカタカラメヤサイダブルニンニクアブラマシマシ！"</i>
-</p>
+Character Packs and versioned Artifacts are a foundation at this stage. They are not yet the
+default content source for `/v1/chat`, and the current front end is not yet a complete pack editor.
+The legacy RAG routes remain available as a compatibility surface while that integration is built.
 
- <div>&nbsp;</div>
+Legacy online knowledge import and index rebuild endpoints are disabled by default. Knowledge
+should be validated and built offline, then published as an immutable Artifact. See
+[Character Pack and Artifact v1](docs/character-packs.md) for the implemented schema, provenance
+rules, integrity checks, atomic publish model, and current limitations.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB.svg?style=flat-square&logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/Node.js-20%2B-339933.svg?style=flat-square&logo=node.js&logoColor=white" alt="Node.js">
-  <img src="https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
-  <img src="https://img.shields.io/badge/Vue.js-3.x-4FC08D.svg?style=flat-square&logo=vuedotjs&logoColor=white" alt="Vue">
-  <img src="https://img.shields.io/badge/Vite-5.x-646CFF.svg?style=flat-square&logo=vite&logoColor=white" alt="Vite">
-  <img src="https://img.shields.io/badge/Tailwind_CSS-4.x-38B2AC.svg?style=flat-square&logo=tailwind-css&logoColor=white" alt="Tailwind">
-</p>
+## Where the project is going
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Ollama-Local_LLM-black.svg?style=flat-square&logo=ollama&logoColor=white" alt="Ollama">
-  <img src="https://img.shields.io/badge/Claude-API-D97706.svg?style=flat-square&logo=anthropic&logoColor=white" alt="Claude">
-  <img src="https://img.shields.io/badge/DeepSeek-API-4F46E5.svg?style=flat-square" alt="DeepSeek">
-  <img src="https://img.shields.io/badge/FAISS-Vector_DB-1877F2.svg?style=flat-square&logo=meta&logoColor=white" alt="FAISS">
-</p>
+The target product is a modular, local-first Persona Studio built around one versioned Character
+Pack boundary:
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green.svg?style=flat-square" alt="License"></a>
-</p>
+- persona, prompt, examples, knowledge, theme, evaluation fixtures, source, licence, and safety
+  metadata travel together;
+- an offline builder validates content and publishes a traceable, rollback-safe Artifact;
+- one Agent Kernel serves the web compatibility API and explicitly authorised transports;
+- typed events and policy-checked actions make agent behaviour replayable and auditable;
+- a Studio supports pack review, evaluation, publish, and rollback;
+- an offline group-chat simulator evaluates decisions before any real message can be sent;
+- privacy controls precede durable memory or autonomous external integrations.
 
-<div>&nbsp;</div>
+These items are staged goals, not claims about the current release. Progress, architectural
+decisions, and acceptance criteria live in [MEMORY.md](MEMORY.md).
 
-> A RAG conversational AI combining FAISS semantic retrieval with pluggable LLM backends (Claude, DeepSeek, or local Ollama). Features multi-turn session memory, SSE token streaming, a modern Vue 3 immersive Galgame UI, and similarity-threshold filtering for hallucination-free character reproduction.
+## Safe local quick start
 
-<div>&nbsp;</div>
+Prerequisites:
 
-[**中文文档 (Chinese Version)**](README_ch.md) | [**Vision**](#vision) | [**Features**](#features) | [**Quick Start**](#quick-start) | [**Architecture**](#architecture) | [**FAQ**](#faq)
+- Python 3.10 or newer;
+- Node.js 22.12 or newer and npm;
+- a reachable LLM provider. Ollama is the default local development provider.
 
-</div>
-
-
----
-
-## Vision
-
-Traditional AI role-playing bots often suffer from two fatal flaws: **"Hallucinations"** (making up fake lore) and **"OOC"** (Out of Character responses). While conventional Fine-tuning can help, it is hardware-intensive and rarely eradicates these issues completely.
-
-**NeneBot** is an attempt to bring **RAG (Retrieval-Augmented Generation)** architecture to *Galgame* character simulation:
-* **External Memory Engine**: By slicing and vectorizing the original script of *Sanoba Witch*, we give the AI "true" memories.
-* **Authentic Reproduction**: The LLM is forced to reference retrieved original dialogue, perfectly capturing Nene's gentle and shy personality.
-* **Pluggable LLM Backend**: Swap between local Ollama and cloud APIs (Claude, DeepSeek) with a single environment variable — no code changes required.
-* **Ultimate Front-end Aesthetics**: Ditching clunky terminal interfaces for an immersive, modern visual novel (Galgame) UI.
-
----
-
-## Features
-
-* **Flexible LLM Backend**: Use local Ollama (Qwen 2.5, Llama, etc.) for full privacy, or plug in a cloud API (Claude, DeepSeek) via a single `LLM_PROVIDER` env var for higher quality.
-* **Multi-Turn Memory**: Per-session conversation history (sliding window) keeps Nene contextually aware across turns.
-* **Real-Time Token Streaming**: SSE-based streaming delivers a native typewriter effect — responses appear word by word.
-* **Millisecond Semantic Retrieval**: Utilizes Meta's FAISS vector database alongside the `bge-small-zh` embedding model to pinpoint relevant historical scripts.
-* **Threshold Fallback Mechanism**: Features a custom `match_threshold` filter (cosine similarity, default `0.55`). If the topic is unfamiliar, Nene seamlessly transitions to zero-shot character playing rather than forcing irrelevant memories.
-* **Immersive Visual Experience**: A stunning Vue 3 + Vite front-end featuring a dark glassmorphism UI, typewriter effects, and dynamic breathing layouts.
-* **Out-of-the-Box Automation**: Includes 1-click installation and startup scripts for both Windows and Linux. No terminal anxiety required.
-
----
-
-## Quick Start
-
-### Option A — One-Click Cloud Deploy (no local setup)
-
-Deploy to [Railway](https://railway.app) in under 5 minutes. Users only need a browser URL.
-
-1. Fork this repo and connect it to Railway.
-2. In Railway's **Variables** panel, set:
-   ```
-   LLM_PROVIDER=deepseek
-   OPENAI_COMPAT_API_KEY=sk-...
-   ```
-3. Railway builds the frontend, installs deps, and starts the server automatically.
-4. Share the generated `*.railway.app` URL — done.
-
----
-
-### Option B — Local Setup
-
-Before starting locally, decide **which LLM backend** you want to use:
-
-* **Local Ollama**: zero API cost, fully local, recommended for offline/private use.
-* **Cloud API (Claude / DeepSeek / OpenAI-compatible)**: better quality and easier setup on lower-end machines.
-
-Create a local `.env` file before your first run:
+Create an isolated backend environment and local configuration:
 
 ```bash
-cp .env.example .env
-```
-
-Then edit only the fields relevant to your provider:
-
-```env
-# Option 1: Local Ollama
-LLM_PROVIDER=ollama
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-LLM_MODEL_NAME=qwen2.5
-
-# Option 2: DeepSeek
-# LLM_PROVIDER=deepseek
-# OPENAI_COMPAT_API_KEY=sk-...
-# OPENAI_COMPAT_BASE_URL=https://api.deepseek.com
-# OPENAI_COMPAT_MODEL=deepseek-chat
-
-# Option 3: Claude
-# LLM_PROVIDER=claude
-# ANTHROPIC_API_KEY=sk-ant-...
-# CLAUDE_MODEL_NAME=claude-haiku-4-5-20251001
-```
-
-> **Good to know:** This repo already includes `data/raw/train.jsonl` and a prebuilt `vector_store/` directory. On a fresh machine, `scripts/setup.sh` will also rebuild the FAISS index if needed.
-
-### For Windows Users
-
-**Step 1: Install Prerequisites (Skip if already installed)**
-1. Download and install [Python 3.10+](https://www.python.org/downloads/). **[CRITICAL]**: Ensure you check <kbd>Add Python to PATH</kbd> at the bottom of the installer!
-2. Download and install [Node.js (LTS version)](https://nodejs.org/).
-3. *(Only if using local Ollama)* Download and install [Ollama for Windows](https://ollama.com/download/windows).
-
-**Step 2: Download NeneBot**
-Click the green `Code` button on this GitHub page and select `Download ZIP`. Extract it to a folder on your PC (e.g., `D:\NeneBot`).
-
-**Step 2.5: Configure your provider**
-Copy `.env.example` to `.env`, then fill in the keys only if you are using a cloud provider.
-
-**Step 3: One-Click Ignition!**
-Open the extracted folder and **double-click `start_windows.bat`**.
-* Grab a coffee. The script will automatically download dependencies, wake up the AI engine, and launch your browser.
-* Once the UI pops up, Nene is ready to chat!
-
----
-
-### For Linux Users 
-
-Open your terminal and execute the following elegant commands:
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/your-username/NeneBot.git
-cd NeneBot
-
-# 2. Create your local environment file
-cp .env.example .env
-
-# 3. Grant execution permissions to scripts
-chmod +x scripts/setup.sh scripts/run.sh
-
-# 4. Run the automated setup (Only required once)
-./scripts/setup.sh
-
-# 5. Ignite the engines!
-./scripts/run.sh
-```
-
-> **Tip:** Once started, visit `http://localhost:5173` in your browser for the UI. The backend API Swagger docs are located at `http://localhost:8000/docs`.
->
-> **Important:** Do **not** open `frontend/index.html` directly in the browser. The application requires a running FastAPI backend (`/v1/*`) and should be accessed through the Vite dev server (`5173`) or the compiled production build served by FastAPI.
-
-### Unified Launcher
-
-For day-to-day usage, prefer the unified launcher instead of remembering multiple raw commands:
-
-```bash
-# Full local development mode: backend + frontend
-python scripts/launch.py dev
-
-# Backend only
-python scripts/launch.py local
-
-# Telegram polling bot
-python scripts/launch.py telegram
-```
-
-If you already created a local virtual environment, use:
-
-```bash
-./venv/bin/python scripts/launch.py dev
-```
-
-### Option C — Single-Port Local Run (production-like)
-
-If you want to access the full app from **one URL only** instead of running Vite separately:
-
-```bash
-# 1. Backend
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-
-# 2. Frontend build
-cd frontend
-npm install
-npm run build
-cd ..
-
-# 3. Serve both API and frontend from FastAPI
-python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
+python -m pip install -r requirements.txt
+cp .env.example .env
 ```
 
-Then open:
+On Windows, activate the environment with `venv\Scripts\activate`. Review `.env` before startup
+and configure only the provider you intend to use. Do not commit `.env` or API keys. For the
+default Ollama configuration, make sure the configured model is installed and the Ollama service
+is running.
 
-* `http://localhost:8000` → Full application
-* `http://localhost:8000/admin` → Read-only admin console
-* `http://localhost:8000/docs` → API docs
-
-### Option D — Docker Compose (app + Redis)
-
-For a more production-like local stack with persistent session storage:
+Install the locked frontend dependencies:
 
 ```bash
-cp .env.example .env
-docker compose -f deploy/docker_compose.yml up --build
+cd frontend
+npm ci
+cd ..
 ```
 
-This stack starts:
+Run the backend on loopback in one terminal:
 
-* `app` on `http://localhost:8000`
-* `redis` on `localhost:6379`
-
-Recommended `.env` settings for this mode:
-
-```env
-SESSION_BACKEND=redis
-REDIS_URL=redis://redis:6379/0
+```bash
+source venv/bin/activate
+python scripts/launch.py local --host 127.0.0.1 --reload
 ```
 
-Operational endpoints:
+Run the frontend in another terminal:
 
-* `GET /health` → service health, vector index status, frontend mode, session backend status
-* `GET /health/live` / `GET /health/ready` → split liveness/readiness probes
-* `GET /metrics` → Prometheus-style metrics text
-* Response header `X-Request-ID` → request correlation id for logs and API debugging
+```bash
+cd frontend
+npm run dev
+```
 
-Optional API protection:
+Open `http://localhost:5173`. API documentation is at `http://127.0.0.1:8000/docs`.
+
+To serve a production-style frontend and API from one local port, build the frontend first and
+then start the backend without `--reload`:
+
+```bash
+cd frontend
+npm ci
+npm run build
+cd ..
+source venv/bin/activate
+python scripts/launch.py local --host 127.0.0.1
+```
+
+Then open `http://127.0.0.1:8000`.
+
+### Authentication and network exposure
+
+Authentication is off in the development example so loopback setup stays simple. Before binding
+to a non-loopback address, enable it and provide separate scoped credentials in `.env` or copy the
+registry template from [config/api_tokens.json.example](config/api_tokens.json.example):
 
 ```env
 API_AUTH_ENABLED=true
-API_AUTH_TOKENS=frontend|chat:dev-chat-token,ops|ops:dev-ops-token
-API_AUTH_REGISTRY_PATH=./config/api_tokens.json
+API_AUTH_TOKENS=local-chat|chat:replace-this,local-ops|ops:replace-this-too
+CORS_ALLOW_ORIGINS=https://your-ui.example
 ```
 
-When enabled, requests must include either:
+An enabled authentication configuration with no valid token fails closed. Treat all tokens as
+secrets. Production configuration also requires Redis-backed sessions; development defaults to
+ephemeral process memory.
 
-* `Authorization: Bearer <token>`
-* `X-API-Key: <token>`
+## Operations
 
-Scope rules:
+The canonical health endpoints are:
 
-* `/v1/*` requires `chat`
-* `/health*` and `/metrics` require `ops`
-* Legacy tokens without explicit scopes still get `chat` + `ops` for backward compatibility
+| Endpoint | Access | Meaning |
+| --- | --- | --- |
+| `GET /livez` | Public | Minimal process liveness |
+| `GET /readyz` | Public | Minimal readiness; returns `503` when dependencies are not ready |
+| `GET /ops/health` | `ops` scope when auth is enabled | Detailed runtime diagnostics |
 
-You can also move tokens into a local registry file instead of `.env`:
+`/health`, `/health/live`, and `/health/ready` remain deprecated compatibility aliases. Detailed
+health and metrics may reveal operational information and should not be exposed without access
+control.
 
-```json
-[
-  { "name": "frontend", "token": "replace-with-chat-token", "scopes": ["chat"] },
-  { "name": "ops-dashboard", "token": "replace-with-ops-token", "scopes": ["ops"] }
-]
-```
+## Verification
 
-See [config/api_tokens.json.example](/home/schrieffer/NeneBot/config/api_tokens.json.example) for the full format.
-
-Server logs also emit JSON audit fields such as `action`, `endpoint`, `session_id`, `auth_subject`, `auth_scopes`, and `request_id`.
-
-Optional tracing:
-
-```env
-TRACING_ENABLED=true
-TRACING_SERVICE_NAME=nenebot
-TRACING_EXPORTER=console
-```
-
-Current spans:
-
-* `http.request`
-* `rag.retrieve`
-* `llm.request`
-
-How to verify tracing works locally:
-
-1. Install updated dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Enable tracing in `.env`:
-   ```env
-   TRACING_ENABLED=true
-   TRACING_EXPORTER=console
-   ```
-3. Start the API server and send one chat request.
-4. Check the server stdout. You should see span output containing names like:
-   * `http.request`
-   * `rag.retrieve`
-   * `llm.request`
-5. Confirm span attributes include fields such as:
-   * `request_id`
-   * `http_path`
-   * `provider_name`
-   * `rag.retrieved_count`
-   * `auth.subject` when a token is used
-
-If you see normal API responses and span dumps in the terminal, tracing is wired correctly.
-
-Read-only admin MVP:
-
-* `GET /admin/api/overview` → runtime, health, LLM, retrieval, auth, integrations summary
-* `GET /admin/api/metrics/summary` → preview of rendered Prometheus metrics
-* `GET /admin/api/knowledge/overview` → dataset summary and vector store summary
-* `POST /admin/api/knowledge/import` → import JSONL dataset content
-* `POST /admin/api/knowledge/rebuild` → rebuild vector index from current dataset
-* `http://localhost:8000/admin` → browser admin console
-
-How to verify the admin console works:
-
-1. Configure an `ops` token in `.env` or `config/api_tokens.json`.
-2. Build the frontend and start the app.
-3. Open `http://localhost:8000/admin`.
-4. When prompted, paste the `ops` token.
-5. Confirm the page shows:
-   * service/environment/version
-   * health status
-   * LLM provider/model
-   * configured auth identities
-   * metrics preview lines
-
-If the page loads and these cards populate, the admin MVP is working.
-
-Knowledge base operations:
-
-* The admin console now includes a knowledge panel for:
-  * viewing dataset preview
-  * validating JSONL before writing
-  * importing JSONL content
-  * rebuilding the vector index
-* Imported content must be JSONL, one JSON object per line, with a `messages` list.
-
-How to verify knowledge import and rebuild:
-
-1. Open `http://localhost:8000/admin` with an `ops` token.
-2. Paste one valid JSONL line into the knowledge textarea, for example:
-   ```json
-   {"messages":[{"role":"system","content":"You are Nene."},{"role":"user","content":"你好"},{"role":"assistant","content":"你好呀，保科君。"}]}
-   ```
-3. Click `VALIDATE` first and confirm the dry-run succeeds.
-4. Click `IMPORT + REBUILD`.
-5. Confirm the page updates:
-   * dataset line count changes
-   * preview shows the imported user/assistant pair
-   * vector store summary refreshes
-6. Send a normal chat request and confirm the service still answers normally.
-
-If the dataset summary updates and rebuild completes without error, the knowledge workflow is connected correctly.
-
-Release gate:
-
-* See [RELEASE_CHECKLIST.md](/home/schrieffer/NeneBot/RELEASE_CHECKLIST.md) before tagging a preview release.
-
-### Option E — Telegram Bot (long polling)
-
-The simplest IM integration path is Telegram via the official Bot API.
-
-1. Create a bot with `@BotFather`
-2. Copy the token into `.env`
-3. Start the polling adapter:
+After installing backend and frontend dependencies, run the repository checks with:
 
 ```bash
-cp .env.example .env
-
-# Fill in:
-# TELEGRAM_BOT_TOKEN=123456:ABC...
-# LLM_PROVIDER=deepseek   # or ollama / claude / openai
-
-python scripts/launch.py telegram
+./scripts/run_linter.sh
 ```
 
-Notes:
+This checks formatting, linting, strict backend/script types, backend tests, and the frontend
+production build. Passing tests establishes the behaviours they cover; it does not guarantee
+factual accuracy, character fidelity, content safety, or legal permission to use a dataset.
 
-* Telegram messages are mapped to internal session ids like `telegram:<chat_id>`
-* Built-in commands: `/start`, `/help`, `/reset`, `/model`
-* `/reset` clears that chat's memory window
-* Default mode is long polling, so you do **not** need a public webhook URL yet
+## Migration, privacy, and content rights
 
-To switch to webhook mode later:
+- The repository may still contain legacy third-party character data, scripts, or artwork awaiting
+  Phase 1 migration. Treat those files as private migration inputs unless you have independently
+  verified redistribution rights. The code licence does not grant rights to third-party content.
+- Only import material you own, have licensed, or may lawfully use. Preserve source, licence,
+  rights basis, safety review, and content hashes in every Character Pack.
+- Cloud LLM providers may receive user messages, prompts, and retrieved excerpts. Obtain informed
+  consent and review the provider's retention and data-use terms before sending sensitive content.
+- The 0.7 session layer is compatibility infrastructure, not a complete privacy system. Durable
+  memory, user export/deletion, consent, and retention controls remain migration work.
+- Telegram and other external transports require explicit operator and participant authorisation.
+  Do not connect this development runtime to real communities as an autonomous agent.
+- Removing files in a future release will not erase them from Git history. History rewriting,
+  credential rotation, and public redistribution require separate operational decisions.
 
-```env
-TELEGRAM_MODE=webhook
-TELEGRAM_PUBLIC_BASE_URL=https://your-domain.com
-TELEGRAM_WEBHOOK_PATH=/integrations/telegram/webhook
-TELEGRAM_WEBHOOK_SECRET=your-secret
-```
+This is an engineering migration notice, not legal advice.
 
-Then start the normal API server. Telegram will POST updates to:
-
-* `POST /integrations/telegram/webhook`
-
-If `TELEGRAM_WEBHOOK_SECRET` is set, the server verifies the
-`X-Telegram-Bot-Api-Secret-Token` header.
-
----
-
-## Architecture
-
-This project strictly adheres to microservice and front/back-end decoupling standards:
+## Repository map
 
 ```text
-NeneBot/
-├── 📂 data/             # Raw script corpus (for vectorization)
-├── 📂 vector_store/     # FAISS persistent vector index
-├── 📂 frontend/         # Vue 3 + Vite immersive UI
-├── 📂 src/              # FastAPI core backend service
-│   ├── api/             # Routing and Pydantic data validation
-│   ├── core/            # pydantic-settings config and global exceptions
-│   ├── infrastructure/  # External adapters (FAISS, Ollama, Claude, DeepSeek)
-│   └── services/        # Core business logic (RAG pipeline, Embeddings, Sessions)
-├── 📂 scripts/          # DevOps toolbox (Setup, Run, Linters)
-├── 📄 railway.toml      # One-click Railway deployment config
-├── 📄 .env.example      # Environment variable template
-├── 📄 pyproject.toml    # Industrial linter configs (Ruff & Mypy)
-└── 📄 requirements.txt  # Python dependency list
+src/                 FastAPI compatibility runtime and new knowledge foundations
+frontend/            Vue/Vite compatibility clients
+src/knowledge/       Character Pack validation and immutable Artifact helpers
+docs/                migration-era formats and operating notes
+scripts/             launch, migration, evaluation, and repository checks
+tests/               backend and ASGI regression tests
+MEMORY.md            long-lived roadmap, decisions, and implementation log
 ```
 
----
-
-## Advanced Configuration
-
-For developers who want to tweak the bot, you can easily customize Nene:
-
-* **Switch LLM Provider**: Set `LLM_PROVIDER` in `.env` to `ollama`, `claude`, `deepseek`, or `openai`. See `.env.example` for the full list of required keys.
-* **Adjust Strictness**: Modify `MATCH_THRESHOLD` (default `0.55`) in `.env` or directly in `src/services/rag_pipeline.py`. Lower values make her stick strictly to the script; higher values allow more creative freedom.
-* **Change Sprites & Backgrounds**: Replace `nene_sprite.png` and `bg_room.png` in the `frontend/public/` directory. Changes apply instantly in dev thanks to Vite HMR.
-* **Modify Character Persona**: Edit the `_CHARACTER_CARD` constant in `src/services/rag_pipeline.py` to add new personality traits or instructions.
-* **Rebuild the Memory Index**: If you replace `data/raw/train.jsonl`, run `python scripts/init_vector_db.py` to regenerate `vector_store/`.
-* **Session Persistence**: Set `SESSION_BACKEND=redis` and configure `REDIS_URL` to persist chat memory across restarts.
-* **Operations**: Use `/health` for diagnostics and `X-Request-ID` to correlate client failures with server logs.
-* **Unified Launcher**: Use `python scripts/launch.py dev`, `local`, or `telegram` depending on the runtime mode you want.
-* **Telegram Adapter**: Set `TELEGRAM_BOT_TOKEN` and run `python scripts/launch.py telegram` to attach the bot to Telegram via long polling.
-
----
-
-## FAQ
-
-<details>
-<summary><b>1. "Python / Node is not recognized as an internal or external command" on Windows?</b></summary>
-
-
-
-
-
-You either haven't installed Python/Node.js, or forgot to add them to your environment variables. Reinstall them and ensure you check the "Add to PATH" option.
-</details>
-
-<details>
-<summary><b>2. The chat shows a connection error or "Nene's thoughts disconnected"?</b></summary>
-
-First verify that the backend is actually running:
-
-* Frontend dev mode: open `http://localhost:5173`
-* Backend health check: open `http://localhost:8000/health`
-* API docs: open `http://localhost:8000/docs`
-
-**If using Ollama:** The Ollama service may not be running, or your machine ran out of VRAM/RAM. Try running `ollama run qwen2.5` manually. On Linux/WSL, also ensure no system proxy is intercepting localhost traffic (`unset http_proxy`).
-
-**If using a cloud API:** Verify that your `ANTHROPIC_API_KEY` or `OPENAI_COMPAT_API_KEY` is set correctly in `.env` and that `LLM_PROVIDER` matches.
-</details>
-
-<details>
-<summary><b>3. Can I open the page directly without starting anything?</b></summary>
-
-No. This is not a static HTML demo.
-
-The Vue page depends on the FastAPI backend for `/v1/chat/stream`, session memory, and RAG retrieval. Use one of these two modes instead:
-
-1. **Development mode**: `./scripts/run.sh` then open `http://localhost:5173`
-2. **Single-port mode**: build `frontend/dist`, start FastAPI, then open `http://localhost:8000`
-</details>
-
-<details>
-<summary><b>4. Can I swap the character to someone else (e.g., Ayase Mitsukasa)?</b></summary>
-
-
-
-
-
-Absolutely! This is a universal architecture. Simply:
-
-1. Replace <code>data/raw/train.jsonl</code> with Ayase's dialogue data.
-2. Run <code>python scripts/init_vector_db.py</code> to rebuild the memory database.
-3. Replace the sprite assets in <code>frontend/public/</code>.
-4. Update the character name and persona in the system prompt.
-</details>
-
----
-
-## Contributing
-
-We welcome contributions from the community! Whether it's fixing bugs, improving the CSS aesthetics, or providing better script datasets, please follow these steps:
-
-1. `Fork` the Project.
-2. Create your Feature Branch: `git checkout -b feature/AmazingFeature`
-3. Commit your Changes: `git commit -m 'feat: Add some AmazingFeature'`
-4. Push to the Branch: `git push origin feature/AmazingFeature`
-5. Open a Pull Request.
-
-*(Note: Before submitting PRs, please run `./scripts/run_linter.sh` to ensure your code passes our strict Ruff and Mypy checks.)*
-
----
-
-## License
-
-Distributed under the **[GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0)**.
-This project is for technical exploration and learning purposes only. The copyright of the character sprites, background art, and game scripts belongs to the original creator (Yuzusoft). Please do not use them for commercial purposes.
+The source code is distributed under [GPL-3.0](LICENSE). Review content rights separately from the
+software licence.

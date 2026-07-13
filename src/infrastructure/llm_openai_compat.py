@@ -35,9 +35,7 @@ class OpenAICompatClient(BaseLLMClient):
             f"base_url={settings.openai_compat_base_url}"
         )
 
-    async def chat_stream(
-        self, messages: list[dict[str, str]]
-    ) -> AsyncIterator[str]:
+    async def chat_stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
         async def stream_factory() -> AsyncIterator[str]:
             stream = await self._client.chat.completions.create(
                 model=self.model,

@@ -1,8 +1,9 @@
 """API routers for chat endpoints (streaming + non-streaming)."""
 
+import asyncio
 import json
 import logging
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -134,6 +135,8 @@ async def chat_stream_endpoint(
         chunk_count = 0
         started_at = now_ms()
         resolved_request = resolve_http_request(http_request)
+        provider_stream: AsyncIterator[str] | None = None
+        error_event: dict[str, str] | None = None
         audit_log(
             "audit_chat_requested",
             request=resolved_request,
@@ -151,13 +154,16 @@ async def chat_stream_endpoint(
             }
             yield f"data: {json.dumps(meta_event)}\n\n"
 
-            async for chunk in llm.chat_stream(messages):
+            provider_stream = llm.chat_stream(messages)
+            async for chunk in provider_stream:
                 chunk_count += 1
                 collected.append(chunk)
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
-        except Exception as e:
-            logger.error(f"event_stream error: {e}")
+        except asyncio.CancelledError:
+            # A disconnected SSE client must cancel the upstream provider call.
+            raise
+        except Exception:
             logger.exception(
                 "llm_stream_failed",
                 extra={
@@ -183,7 +189,6 @@ async def chat_stream_endpoint(
                 "type": "error",
                 "message": "（宁宁的思绪突然断开了……）",
             }
-            yield f"data: {json.dumps(error_event)}\n\n"
         else:
             # Only persist the turn when no exception occurred
             sessions.add_turn(session_id, request.query, "".join(collected))
@@ -210,8 +215,17 @@ async def chat_stream_endpoint(
                 session_id=session_id,
             )
         finally:
-            # 'done' MUST always be sent so the client exits its read loop.
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            if provider_stream is not None:
+                close = getattr(provider_stream, "aclose", None)
+                if close is not None:
+                    try:
+                        await close()
+                    except Exception:
+                        logger.exception("llm_stream_close_failed")
+
+        if error_event is not None:
+            yield f"data: {json.dumps(error_event)}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     return StreamingResponse(
         event_stream(),

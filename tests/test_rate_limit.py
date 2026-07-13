@@ -43,5 +43,6 @@ def test_rate_limit_middleware_returns_429() -> None:
     first = asyncio.run(middleware.dispatch(request, call_next))
     assert first.status_code == 200
 
-    with pytest.raises(RateLimitExceededError):
-        asyncio.run(middleware.dispatch(request, call_next))
+    limited = asyncio.run(middleware.dispatch(request, call_next))
+    assert limited.status_code == 429
+    assert limited.headers["Retry-After"] == "60"

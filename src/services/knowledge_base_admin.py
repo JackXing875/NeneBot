@@ -3,12 +3,40 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from src.core.config import settings
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
+
+LEGACY_ONLINE_MUTATIONS_ENV = "NENEBOT_ENABLE_LEGACY_ONLINE_KNOWLEDGE_MUTATIONS"
+_ENABLED_VALUES = frozenset({"1", "true", "yes", "on"})
+
+
+def online_knowledge_mutations_enabled() -> bool:
+    """Return whether the unsafe legacy online mutation path was explicitly enabled."""
+    return os.getenv(LEGACY_ONLINE_MUTATIONS_ENV, "").strip().lower() in _ENABLED_VALUES
+
+
+def knowledge_mutation_status() -> dict[str, Any]:
+    """Describe the online policy without changing or rebuilding active knowledge."""
+    enabled = online_knowledge_mutations_enabled()
+    return {
+        "online_mutations_enabled": enabled,
+        "mode": "legacy_online" if enabled else "offline_artifacts_only",
+        "override_env": LEGACY_ONLINE_MUTATIONS_ENV,
+        "message": (
+            "Legacy online import/rebuild is explicitly enabled."
+            if enabled
+            else (
+                "Online import/rebuild is disabled; validate and publish versioned "
+                "artifacts offline."
+            )
+        ),
+    }
 
 
 def _extract_dialogue_pair(item: dict[str, Any]) -> dict[str, str]:
@@ -86,11 +114,25 @@ def validate_jsonl_content(content: str) -> list[dict[str, Any]]:
 
 
 def write_jsonl_dataset(content: str, file_path: str) -> dict[str, Any]:
+    """Write a legacy ChatML dataset atomically.
+
+    This function remains available to offline scripts and the explicitly enabled legacy
+    admin path.  New Character Packs use ``src.knowledge`` instead.
+    """
     validate_jsonl_content(content)
 
     path = Path(file_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content.strip() + "\n", encoding="utf-8")
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as file_handle:
+            file_handle.write(content.strip() + "\n")
+            file_handle.flush()
+            os.fsync(file_handle.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
     return summarize_dataset(str(path))
 
 

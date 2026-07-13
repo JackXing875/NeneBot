@@ -1,0 +1,35 @@
+# Deny everything by default. Re-include only inputs used by deploy/Dockerfile.
+**
+
+!deploy/
+!deploy/Dockerfile
+!requirements.txt
+
+!src/
+!src/**
+!scripts/
+!scripts/**
+
+!data/
+!data/prompts.yaml
+!data/persona/
+!data/persona/**
+!data/raw/
+!data/raw/train.jsonl
+
+!frontend/
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/index.html
+!frontend/admin.html
+!frontend/vite.config.js
+!frontend/tailwind.config.js
+!frontend/public/
+!frontend/public/**
+!frontend/src/
+!frontend/src/**
+
+# Re-included source trees may contain local caches or OS metadata.
+**/__pycache__/
+**/*.py[cod]
+**/*:Zone.Identifier

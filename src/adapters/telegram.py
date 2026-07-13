@@ -183,11 +183,7 @@ class TelegramBotRunner:
         command = message.text.split()[0].split("@")[0].lower()
 
         if command == "/start":
-            return (
-                "你好呀，我是宁宁。\n"
-                "直接和我聊天就可以了。\n"
-                "可用命令：/help /reset /model"
-            )
+            return "你好呀，我是宁宁。\n直接和我聊天就可以了。\n可用命令：/help /reset /model"
         if command == "/help":
             return (
                 "使用说明：\n"
@@ -222,9 +218,7 @@ async def configure_telegram_delivery(api: TelegramBotAPI) -> None:
     if mode == "webhook":
         if not settings.telegram_public_base_url:
             raise RuntimeError("TELEGRAM_PUBLIC_BASE_URL is required when TELEGRAM_MODE=webhook.")
-        webhook_url = (
-            settings.telegram_public_base_url.rstrip("/") + settings.telegram_webhook_path
-        )
+        webhook_url = settings.telegram_public_base_url.rstrip("/") + settings.telegram_webhook_path
         await api.set_webhook(webhook_url, settings.telegram_webhook_secret)
         logger.info(
             "telegram_delivery_configured",

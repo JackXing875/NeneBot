@@ -1,4 +1,5 @@
 """FastAPI application entry point with lifespan service initialization."""
+
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
@@ -9,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from src.adapters.telegram import (
     TelegramBotAPI,
@@ -37,6 +39,33 @@ from src.runtime import RuntimeServices, build_runtime_services, check_session_b
 from src.services.session_store import SessionStore
 
 logger = setup_logger()
+
+
+async def build_runtime_health(app: FastAPI) -> dict[str, object]:
+    """Collect health without moving the FAISS object across threads."""
+    vector_store: FaissVectorStore = app.state.vector_store
+    session_store: SessionStore = app.state.session_store
+    if getattr(session_store, "backend_name", "memory") == "redis":
+        session_ok, session_error = await run_in_threadpool(check_session_backend, session_store)
+    else:
+        session_ok, session_error = check_session_backend(session_store)
+    return build_health_payload(
+        vector_store=vector_store,
+        frontend_dist_exists=Path(settings.frontend_dist_dir).exists(),
+        session_backend_name=getattr(session_store, "backend_name", "unknown"),
+        session_backend_ok=session_ok,
+        session_backend_error=session_error,
+    )
+
+
+def public_readiness_payload(health: dict[str, object]) -> dict[str, object]:
+    """Return a minimal probe response without paths or provider details."""
+    return {
+        "status": health.get("status", "degraded"),
+        "ready": bool(health.get("ready")),
+        "service": "nenebot",
+        "timestamp": health.get("timestamp"),
+    }
 
 
 @asynccontextmanager
@@ -89,29 +118,32 @@ def create_app() -> FastAPI:
     app.include_router(chat_router)
     app.include_router(admin_router)
 
-    @app.get("/health", tags=["Ops"])
-    async def health_check(_: None = Depends(require_api_scope("ops"))) -> dict[str, object]:
-        vs: FaissVectorStore = app.state.vector_store
-        session_store: SessionStore = app.state.session_store
-        frontend_dist = Path(settings.frontend_dist_dir)
-        session_ok, session_error = check_session_backend(session_store)
-        return build_health_payload(
-            vector_store=vs,
-            frontend_dist_exists=frontend_dist.exists(),
-            session_backend_name=getattr(session_store, "backend_name", "unknown"),
-            session_backend_ok=session_ok,
-            session_backend_error=session_error,
-        )
+    @app.get("/ops/health", tags=["Ops"])
+    async def ops_health(_: None = Depends(require_api_scope("ops"))) -> dict[str, object]:
+        return await build_runtime_health(app)
 
-    @app.get("/health/live", tags=["Ops"])
-    async def liveness_check(_: None = Depends(require_api_scope("ops"))) -> dict[str, object]:
+    @app.get("/health", tags=["Ops"], deprecated=True)
+    async def health_compat(_: None = Depends(require_api_scope("ops"))) -> dict[str, object]:
+        """Compatibility alias for the protected detailed health endpoint."""
+        return await build_runtime_health(app)
+
+    @app.get("/livez", tags=["Probes"])
+    async def liveness_probe() -> dict[str, object]:
         return build_liveness_payload()
 
-    @app.get("/health/ready", tags=["Ops"])
-    async def readiness_check() -> JSONResponse:
-        payload = await health_check()
-        status_code = 200 if bool(payload.get("ready")) else 503
+    @app.get("/readyz", tags=["Probes"])
+    async def readiness_probe() -> JSONResponse:
+        payload = public_readiness_payload(await build_runtime_health(app))
+        status_code = 200 if bool(payload["ready"]) else 503
         return JSONResponse(status_code=status_code, content=payload)
+
+    @app.get("/health/live", tags=["Probes"], deprecated=True)
+    async def liveness_compat() -> dict[str, object]:
+        return await liveness_probe()
+
+    @app.get("/health/ready", tags=["Probes"], deprecated=True)
+    async def readiness_compat() -> JSONResponse:
+        return await readiness_probe()
 
     @app.get("/metrics", tags=["Ops"])
     async def metrics(_: None = Depends(require_api_scope("ops"))) -> PlainTextResponse:
@@ -137,6 +169,7 @@ def create_app() -> FastAPI:
     # In production (Railway), the build step creates frontend/dist before uvicorn starts.
     frontend_dist = Path(settings.frontend_dist_dir)
     if frontend_dist.exists():
+
         @app.get("/admin", include_in_schema=False)
         async def admin_console(_: None = Depends(require_api_scope("ops"))) -> FileResponse:
             return FileResponse(frontend_dist / "admin.html")

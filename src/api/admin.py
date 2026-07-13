@@ -14,6 +14,8 @@ from src.core.observability import build_health_payload
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
 from src.runtime import check_session_backend
 from src.services.knowledge_base_admin import (
+    knowledge_mutation_status,
+    online_knowledge_mutations_enabled,
     rebuild_knowledge_base,
     summarize_dataset,
     write_jsonl_dataset,
@@ -38,8 +40,11 @@ class KnowledgeImportRequest(BaseModel):
         ),
     )
     rebuild: bool = Field(
-        True,
-        description="Whether to rebuild the vector index immediately after import.",
+        False,
+        description=(
+            "Legacy option to rebuild immediately after import. Online mutations are disabled "
+            "unless the documented emergency override is explicitly enabled."
+        ),
     )
     dry_run: bool = Field(
         False,
@@ -55,8 +60,7 @@ class KnowledgeImportRequest(BaseModel):
         if byte_size > limit:
             limit_mib = limit / (1024 * 1024)
             raise ValueError(
-                f"Content exceeds {limit_mib:.0f} MiB limit ({byte_size} bytes, "
-                f"max {limit} bytes)."
+                f"Content exceeds {limit_mib:.0f} MiB limit ({byte_size} bytes, max {limit} bytes)."
             )
         return v
 
@@ -65,6 +69,29 @@ class KnowledgeActionResponse(BaseModel):
     dataset: dict[str, Any]
     vector_store: dict[str, Any] | None = None
     dry_run: bool = False
+
+
+def _require_online_knowledge_mutations(
+    *,
+    request: Request,
+    action: str,
+    endpoint: str,
+) -> None:
+    """Fail closed before a legacy endpoint can touch the active dataset or index."""
+    if online_knowledge_mutations_enabled():
+        return
+    status = knowledge_mutation_status()
+    audit_log(
+        "admin_knowledge_mutation_blocked",
+        request=request,
+        action=action,
+        endpoint=endpoint,
+        policy_mode=status["mode"],
+    )
+    raise HTTPException(
+        status_code=503,
+        detail=(f"{status['message']} Temporary legacy override: {status['override_env']}=true."),
+    )
 
 
 def _session_summary(session_store: SessionStore) -> dict[str, object]:
@@ -175,11 +202,17 @@ async def admin_knowledge_overview(request: Request) -> dict[str, Any]:
             "index_path": vector_store.index_path,
             "metadata_path": vector_store.meta_path,
         },
+        "operations": knowledge_mutation_status(),
     }
 
 
 @admin_router.post("/knowledge/rebuild", response_model=KnowledgeActionResponse)
 async def admin_knowledge_rebuild(request: Request) -> KnowledgeActionResponse:
+    _require_online_knowledge_mutations(
+        request=request,
+        action="knowledge_rebuild",
+        endpoint="/admin/api/knowledge/rebuild",
+    )
     audit_log(
         "admin_knowledge_rebuild_requested",
         request=request,
@@ -204,6 +237,11 @@ async def admin_knowledge_import(
     payload: KnowledgeImportRequest,
     request: Request,
 ) -> KnowledgeActionResponse:
+    _require_online_knowledge_mutations(
+        request=request,
+        action="knowledge_import",
+        endpoint="/admin/api/knowledge/import",
+    )
     audit_log(
         "admin_knowledge_import_requested",
         request=request,

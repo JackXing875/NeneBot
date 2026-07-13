@@ -1,13 +1,19 @@
 #!/bin/bash
-# Script to run formatters and linters across the codebase.
+set -euo pipefail
 
-echo "Running Ruff formatter..."
-ruff format src/ scripts/
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$PROJECT_ROOT"
 
-echo "Running Ruff linter..."
-ruff check src/ scripts/ --fix
+PYTHON_BIN="python"
+if [ -x "$PROJECT_ROOT/venv/bin/python" ]; then
+    PYTHON_BIN="$PROJECT_ROOT/venv/bin/python"
+fi
 
-echo "Running Mypy static type checking..."
-mypy src/
+"$PYTHON_BIN" -m ruff format --check src tests scripts
+"$PYTHON_BIN" -m ruff check src tests scripts
+"$PYTHON_BIN" -m mypy src scripts
+"$PYTHON_BIN" -m pytest -q
 
-echo "Code quality checks completed!"
+(cd frontend && npm run build)
+
+echo "All project checks passed."

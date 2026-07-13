@@ -60,8 +60,7 @@ def test_score_retrieval_hit_penalizes_intimate_noise_even_if_keyword_matches() 
     top1 = {
         "query_text": "喜欢你……嗯嗯、超级喜欢……嗯啾噜、啾、啾",
         "bot_response": (
-            "呼噜呼噜……嗯呜呜、我也、我也喜欢你、非常喜欢……"
-            "啾、呼噜呼噜呼噜、啾、啾、啾————……"
+            "呼噜呼噜……嗯呜呜、我也、我也喜欢你、非常喜欢……啾、呼噜呼噜呼噜、啾、啾、啾————……"
         ),
         "query_tags": ["relationship", "confession", "intimate_noise"],
         "response_tags": ["relationship", "confession", "intimate_noise"],

@@ -23,9 +23,12 @@ def test_build_health_payload_reports_backend_and_vector_state(fake_vector_store
     assert payload["frontend"]["status"] == "dev-mode"
 
 
-def test_build_health_payload_reports_ready_when_index_files_exist(fake_vector_store) -> None:
-    Path(fake_vector_store.index_path).write_bytes(b"")
-    Path(fake_vector_store.meta_path).write_text("{}", encoding="utf-8")
+def test_build_health_payload_reports_ready_when_index_is_usable(fake_vector_store) -> None:
+    fake_vector_store.add_texts(
+        texts=["hello"],
+        embeddings=[[1.0] + [0.0] * 511],
+        metadata=[{"bot_response": "world"}],
+    )
 
     payload = build_health_payload(
         vector_store=fake_vector_store,
@@ -37,6 +40,22 @@ def test_build_health_payload_reports_ready_when_index_files_exist(fake_vector_s
     assert payload["status"] == "ok"
     assert payload["ready"] is True
     assert payload["frontend"]["status"] == "ok"
+
+
+def test_build_health_payload_rejects_empty_index_files(fake_vector_store) -> None:
+    Path(fake_vector_store.index_path).write_bytes(b"")
+    Path(fake_vector_store.meta_path).write_text("{}", encoding="utf-8")
+
+    payload = build_health_payload(
+        vector_store=fake_vector_store,
+        frontend_dist_exists=True,
+        session_backend_name="memory",
+        session_backend_ok=True,
+    )
+
+    assert payload["status"] == "degraded"
+    assert payload["ready"] is False
+    assert payload["vector_store"]["status"] == "invalid"
 
 
 def test_build_liveness_payload_is_always_ok() -> None:

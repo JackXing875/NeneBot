@@ -49,7 +49,6 @@ class JsonFormatter(logging.Formatter):
             "auth_subject",
             "client_ip",
             "session_id",
-            "auth_token_preview",
             "auth_scopes",
         ):
             value = getattr(record, field, None)
@@ -74,7 +73,15 @@ def build_health_payload(
     llm_model = settings.effective_llm_model
     vector_index_exists = Path(vector_store.index_path).exists()
     knowledge_meta_exists = Path(vector_store.meta_path).exists()
-    ready = session_backend_ok and vector_index_exists and knowledge_meta_exists
+    index_vectors = int(vector_store.index.ntotal)
+    metadata_records = len(vector_store.metadata)
+    vector_store_usable = (
+        vector_index_exists
+        and knowledge_meta_exists
+        and index_vectors > 0
+        and metadata_records == index_vectors
+    )
+    ready = session_backend_ok and vector_store_usable
 
     payload: dict[str, object] = {
         "status": "ok" if ready else "degraded",
@@ -88,8 +95,15 @@ def build_health_payload(
             "ttl_seconds": settings.session_ttl_seconds,
         },
         "vector_store": {
-            "status": "ok" if vector_index_exists and knowledge_meta_exists else "missing",
-            "index_vectors": vector_store.index.ntotal,
+            "status": (
+                "ok"
+                if vector_store_usable
+                else "invalid"
+                if vector_index_exists and knowledge_meta_exists
+                else "missing"
+            ),
+            "index_vectors": index_vectors,
+            "metadata_records": metadata_records,
             "index_path": vector_store.index_path,
             "index_exists": vector_index_exists,
             "metadata_path": vector_store.meta_path,

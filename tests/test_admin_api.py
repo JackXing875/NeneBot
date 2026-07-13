@@ -1,6 +1,9 @@
 import asyncio
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+
 from src.api.admin import (
     KnowledgeImportRequest,
     admin_knowledge_import,
@@ -11,6 +14,7 @@ from src.api.admin import (
 )
 from src.core.config import settings
 from src.core.metrics import auth_failures_total
+from src.services.knowledge_base_admin import LEGACY_ONLINE_MUTATIONS_ENV
 
 
 def test_admin_overview_returns_runtime_summary(
@@ -57,6 +61,7 @@ def test_admin_knowledge_overview_returns_dataset_summary(
     monkeypatch,
     tmp_path,
 ) -> None:
+    monkeypatch.delenv(LEGACY_ONLINE_MUTATIONS_ENV, raising=False)
     dataset_path = tmp_path / "train.jsonl"
     dataset_path.write_text(
         '{"messages":[{"role":"user","content":"你好"},{"role":"assistant","content":"你好呀"}]}\n',
@@ -77,9 +82,11 @@ def test_admin_knowledge_overview_returns_dataset_summary(
 
     assert payload["dataset"]["line_count"] == 1
     assert payload["dataset"]["preview"][0]["user"] == "你好"
+    assert payload["operations"]["online_mutations_enabled"] is False
+    assert payload["operations"]["mode"] == "offline_artifacts_only"
 
 
-def test_admin_knowledge_import_writes_dataset_without_rebuild(
+def test_admin_knowledge_import_is_disabled_by_default(
     fake_vector_store,
     fake_session_store,
     monkeypatch,
@@ -87,6 +94,46 @@ def test_admin_knowledge_import_writes_dataset_without_rebuild(
 ) -> None:
     dataset_path = tmp_path / "train.jsonl"
     monkeypatch.setattr(settings, "data_path", str(dataset_path))
+    monkeypatch.delenv(LEGACY_ONLINE_MUTATIONS_ENV, raising=False)
+    request = SimpleNamespace(
+        app=SimpleNamespace(
+            state=SimpleNamespace(
+                vector_store=fake_vector_store,
+                rag_pipeline=SimpleNamespace(vector_store=fake_vector_store),
+                session_store=fake_session_store,
+            )
+        ),
+        state=SimpleNamespace(auth_subject="ops-dashboard", auth_scopes=["ops"]),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            admin_knowledge_import(
+                KnowledgeImportRequest(
+                    content=(
+                        '{"messages":[{"role":"user","content":"测试"},'
+                        '{"role":"assistant","content":"禁止写入"}]}'
+                    ),
+                    rebuild=False,
+                ),
+                request,
+            )
+        )
+
+    assert exc_info.value.status_code == 503
+    assert "offline" in str(exc_info.value.detail).lower()
+    assert not dataset_path.exists()
+
+
+def test_admin_legacy_import_requires_explicit_override(
+    fake_vector_store,
+    fake_session_store,
+    monkeypatch,
+    tmp_path,
+) -> None:
+    dataset_path = tmp_path / "train.jsonl"
+    monkeypatch.setattr(settings, "data_path", str(dataset_path))
+    monkeypatch.setenv(LEGACY_ONLINE_MUTATIONS_ENV, "true")
 
     request = SimpleNamespace(
         app=SimpleNamespace(
@@ -126,6 +173,7 @@ def test_admin_knowledge_import_supports_dry_run(
         encoding="utf-8",
     )
     monkeypatch.setattr(settings, "data_path", str(dataset_path))
+    monkeypatch.setenv(LEGACY_ONLINE_MUTATIONS_ENV, "true")
 
     request = SimpleNamespace(
         app=SimpleNamespace(
@@ -167,6 +215,7 @@ def test_admin_knowledge_rebuild_refreshes_vector_store(
     monkeypatch.setattr(settings, "data_path", str(dataset_path))
     monkeypatch.setattr(settings, "vector_index_path", str(tmp_path / "faiss_index.bin"))
     monkeypatch.setattr(settings, "knowledge_meta_path", str(tmp_path / "knowledge_base.json"))
+    monkeypatch.setenv(LEGACY_ONLINE_MUTATIONS_ENV, "true")
 
     def fake_rebuild() -> dict[str, object]:
         fake_vector_store.metadata = [{"query_text": "你好", "bot_response": "你好呀"}]

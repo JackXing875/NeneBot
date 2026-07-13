@@ -29,10 +29,9 @@ class OllamaClient(BaseLLMClient):
         }
         logger.info(f"OllamaClient initialized: model={self.model_name}")
 
-    async def chat_stream(
-        self, messages: list[dict[str, str]]
-    ) -> AsyncIterator[str]:
+    async def chat_stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
         """Yields response content chunks from Ollama's streaming API."""
+
         async def stream_factory() -> AsyncIterator[str]:
             payload = {
                 "model": self.model_name,

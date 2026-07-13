@@ -106,19 +106,61 @@ async def resilient_stream(
     provider_name: str,
     model_name: str | None,
 ) -> AsyncIterator[str]:
-    """Open and consume a provider stream with timeout/retry handling."""
-    queue: list[str] = await with_retries(
-        lambda: _consume_stream(factory),
+    """Yield provider chunks as they arrive with safe retry semantics.
+
+    A provider call may be retried only before its first chunk is exposed to
+    the caller.  Retrying after output has started could duplicate content, so
+    later failures are surfaced immediately instead.
+    """
+    started = await with_retries(
+        lambda: _start_stream(factory),
         provider_name=provider_name,
         model_name=model_name,
     )
-    for chunk in queue:
-        yield chunk
+    if started is None:
+        return
+
+    stream, first_chunk = started
+    try:
+        yield first_chunk
+        while True:
+            try:
+                chunk = await asyncio.wait_for(
+                    anext(stream),
+                    timeout=settings.llm_timeout_seconds,
+                )
+            except StopAsyncIteration:
+                return
+            except asyncio.TimeoutError as exc:
+                llm_failures_total.inc(provider_name=provider_name, reason="stream_timeout")
+                raise LLMTimeoutError() from exc
+            except Exception as exc:
+                llm_failures_total.inc(provider_name=provider_name, reason="stream_interrupted")
+                raise LLMProviderUnavailableError(str(exc)) from exc
+            else:
+                yield chunk
+    finally:
+        await _close_stream(stream)
 
 
-async def _consume_stream(factory: Callable[[], AsyncIterator[str]]) -> list[str]:
-    """Consume the provider stream into memory after a successful call."""
-    chunks: list[str] = []
-    async for chunk in factory():
-        chunks.append(chunk)
-    return chunks
+async def _start_stream(
+    factory: Callable[[], AsyncIterator[str]],
+) -> tuple[AsyncIterator[str], str] | None:
+    """Open a stream and read its first chunk without consuming the remainder."""
+    stream = factory()
+    try:
+        first_chunk = await anext(stream)
+    except StopAsyncIteration:
+        await _close_stream(stream)
+        return None
+    except BaseException:
+        await _close_stream(stream)
+        raise
+    return stream, first_chunk
+
+
+async def _close_stream(stream: AsyncIterator[str]) -> None:
+    """Close async-generator resources when the provider exposes ``aclose``."""
+    close = getattr(stream, "aclose", None)
+    if close is not None:
+        await close()

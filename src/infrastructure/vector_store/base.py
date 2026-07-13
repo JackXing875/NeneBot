@@ -35,9 +35,7 @@ class BaseVectorStore(ABC):
         pass
 
     @abstractmethod
-    def search(
-        self, query_embedding: List[float], top_k: int = 3
-    ) -> List[Dict[str, Any]]:
+    def search(self, query_embedding: List[float], top_k: int = 3) -> List[Dict[str, Any]]:
         """Searches the vector store for the closest matching embeddings.
 
         Args:

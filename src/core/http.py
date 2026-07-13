@@ -95,7 +95,6 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                         "client_ip": client,
                         "duration_ms": duration_ms,
                         "auth_subject": auth_subject,
-                        "auth_token_preview": getattr(request.state, "auth_token_preview", None),
                         "auth_scopes": getattr(request.state, "auth_scopes", None),
                     },
                 )

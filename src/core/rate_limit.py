@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 from typing import DefaultDict
 
 from fastapi import Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
@@ -53,7 +53,22 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         if request.url.path.startswith("/v1/"):
             key = request.client.host if request.client else "unknown"
-            self.limiter.check(key)
+            try:
+                self.limiter.check(key)
+            except RateLimitExceededError as exc:
+                request_id = getattr(request.state, "request_id", "-")
+                return JSONResponse(
+                    status_code=exc.status_code,
+                    content={
+                        "error": {
+                            "code": exc.code,
+                            "message": exc.message,
+                            "status_code": exc.status_code,
+                        },
+                        "request_id": request_id,
+                    },
+                    headers={"Retry-After": str(self.limiter.window_seconds)},
+                )
         return await call_next(request)
 
 

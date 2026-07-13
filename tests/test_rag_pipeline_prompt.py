@@ -34,6 +34,8 @@ def test_build_messages_uses_nene_character_card_and_reference_block() -> None:
     assert "参考样本" in messages[0]["content"]
     assert "角色补充参考" in messages[0]["content"]
     assert "脸皮非常薄" in messages[0]["content"]
+    assert "回应\n7." in messages[0]["content"]
+    assert "为准\n8." in messages[0]["content"]
     assert messages[-1] == {"role": "user", "content": "今天有点累"}
 
 

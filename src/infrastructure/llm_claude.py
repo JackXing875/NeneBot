@@ -29,9 +29,7 @@ class ClaudeClient(BaseLLMClient):
         self.model = settings.claude_model_name
         logger.info(f"ClaudeClient initialized with model={self.model}")
 
-    async def chat_stream(
-        self, messages: list[dict[str, str]]
-    ) -> AsyncIterator[str]:
+    async def chat_stream(self, messages: list[dict[str, str]]) -> AsyncIterator[str]:
         async def stream_factory() -> AsyncIterator[str]:
             system_content = ""
             chat_messages: list[dict[str, str]] = []
