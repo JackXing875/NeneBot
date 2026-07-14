@@ -23,8 +23,8 @@ class RedisSessionStore:
         max_history: int = 20,
         ttl_seconds: int = 86400,
         client: Redis | None = None,
-        key_prefix: str = "nenebot:session:",
-        language_key_prefix: str = "nenebot:session-lang:",
+        key_prefix: str = "persona-studio:session:",
+        language_key_prefix: str = "persona-studio:session-lang:",
     ) -> None:
         if max_history < 2:
             raise ValueError("max_history must retain at least one user/assistant turn.")

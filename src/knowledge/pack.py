@@ -27,7 +27,10 @@ PACK_MANIFEST_FILENAME = "manifest.json"
 PACK_SCHEMA_VERSION = 1
 KNOWLEDGE_SCHEMA_VERSION = 1
 MAX_PERSONA_BYTES = 256 * 1024
+MAX_PROMPT_BYTES = 256 * 1024
 MAX_KNOWLEDGE_BYTES = 64 * 1024 * 1024
+MAX_EVALUATION_BYTES = 2 * 1024 * 1024
+MAX_THEME_BYTES = 64 * 1024
 
 _PACK_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 _RECORD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -108,6 +111,88 @@ class SafetyReview(BaseModel):
         if value is None:
             return None
         return _require_clean_text(value, field_name="notes")
+
+    @model_validator(mode="after")
+    def _require_completed_review(self) -> SafetyReview:
+        if not self.reviewed:
+            raise ValueError("Every published knowledge record must be safety reviewed.")
+        return self
+
+
+class EvaluationCase(BaseModel):
+    """Deterministic retrieval expectation shipped with a Character Pack."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    id: str = Field(min_length=1, max_length=128)
+    query: str = Field(min_length=1, max_length=4_000)
+    expected_record_ids: list[str] = Field(min_length=1, max_length=10)
+    top_k: int = Field(default=3, ge=1, le=10)
+
+    @field_validator("id")
+    @classmethod
+    def _validate_id(cls, value: str) -> str:
+        if _RECORD_ID_RE.fullmatch(value) is None:
+            raise ValueError("id contains unsupported characters.")
+        return value
+
+    @field_validator("query")
+    @classmethod
+    def _validate_query(cls, value: str) -> str:
+        return _require_clean_text(value, field_name="query")
+
+    @field_validator("expected_record_ids")
+    @classmethod
+    def _validate_expected_record_ids(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("expected_record_ids must be unique.")
+        for value in values:
+            if _RECORD_ID_RE.fullmatch(value) is None:
+                raise ValueError("expected_record_ids contains an unsupported record id.")
+        return values
+
+
+class EvaluationSuite(BaseModel):
+    """Versioned offline evaluation cases for one Pack."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    schema_version: Literal[1]
+    cases: list[EvaluationCase] = Field(min_length=1, max_length=200)
+
+    @field_validator("cases")
+    @classmethod
+    def _validate_unique_case_ids(cls, values: list[EvaluationCase]) -> list[EvaluationCase]:
+        case_ids = [case.id for case in values]
+        if len(case_ids) != len(set(case_ids)):
+            raise ValueError("Evaluation case ids must be unique.")
+        return values
+
+
+class ThemeAvatar(BaseModel):
+    """Code-native avatar configuration; public Packs need no bundled character art."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    kind: Literal["initials"]
+    text: str = Field(min_length=1, max_length=4)
+
+    @field_validator("text")
+    @classmethod
+    def _validate_text(cls, value: str) -> str:
+        return _require_clean_text(value, field_name="avatar.text")
+
+
+class PackTheme(BaseModel):
+    """Small, validated theme contract consumed by current and future clients."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    schema_version: Literal[1]
+    primary_color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
+    accent_color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
+    background_color: str = Field(pattern=r"^#[0-9a-fA-F]{6}$")
+    avatar: ThemeAvatar
 
 
 def calculate_knowledge_content_sha256(
@@ -201,7 +286,10 @@ class CharacterPackManifest(BaseModel):
     display_name: str = Field(min_length=1, max_length=100)
     default_locale: str = Field(min_length=2, max_length=20)
     persona_path: str
+    prompt_path: str
     knowledge_path: str
+    evaluation_path: str
+    theme_path: str
     provenance: Provenance
 
     @field_validator("pack_id")
@@ -236,10 +324,20 @@ class CharacterPackManifest(BaseModel):
     def _validate_persona_path(cls, value: str) -> str:
         return _validate_relative_path(value, suffix=".md")
 
+    @field_validator("prompt_path")
+    @classmethod
+    def _validate_prompt_path(cls, value: str) -> str:
+        return _validate_relative_path(value, suffix=".md")
+
     @field_validator("knowledge_path")
     @classmethod
     def _validate_knowledge_path(cls, value: str) -> str:
         return _validate_relative_path(value, suffix=".jsonl")
+
+    @field_validator("evaluation_path", "theme_path")
+    @classmethod
+    def _validate_json_path(cls, value: str) -> str:
+        return _validate_relative_path(value, suffix=".json")
 
 
 @dataclass(frozen=True)
@@ -249,9 +347,16 @@ class ValidatedCharacterPack:
     root: Path
     manifest: CharacterPackManifest
     records: tuple[KnowledgeRecord, ...]
+    persona: str
+    prompt: str
+    evaluation: EvaluationSuite
+    theme: PackTheme
     manifest_sha256: str
     persona_sha256: str
+    prompt_sha256: str
     knowledge_sha256: str
+    evaluation_sha256: str
+    theme_sha256: str
     content_hash: str
 
 
@@ -297,6 +402,34 @@ def load_pack_manifest(path: Path) -> CharacterPackManifest:
         return CharacterPackManifest.model_validate(payload)
     except ValidationError as exc:
         raise _format_validation_error(str(path), exc) from exc
+
+
+def _load_json_model(path: Path, model: type[BaseModel]) -> BaseModel:
+    payload = _parse_json_object(path.read_text(encoding="utf-8"), source=str(path))
+    try:
+        return model.model_validate(payload)
+    except ValidationError as exc:
+        raise _format_validation_error(str(path), exc) from exc
+
+
+def load_evaluation_suite(path: Path) -> EvaluationSuite:
+    """Load a strict evaluation suite from a regular JSON file."""
+    if not path.is_file() or path.is_symlink():
+        raise PackValidationError(f"Evaluation suite must be a regular file: {path}")
+    if path.stat().st_size > MAX_EVALUATION_BYTES:
+        raise PackValidationError(
+            f"Evaluation suite exceeds the {MAX_EVALUATION_BYTES}-byte validation limit."
+        )
+    return cast(EvaluationSuite, _load_json_model(path, EvaluationSuite))
+
+
+def load_pack_theme(path: Path) -> PackTheme:
+    """Load a strict code-native Pack theme."""
+    if not path.is_file() or path.is_symlink():
+        raise PackValidationError(f"Pack theme must be a regular file: {path}")
+    if path.stat().st_size > MAX_THEME_BYTES:
+        raise PackValidationError(f"Pack theme exceeds the {MAX_THEME_BYTES}-byte limit.")
+    return cast(PackTheme, _load_json_model(path, PackTheme))
 
 
 def load_knowledge_records(path: Path) -> tuple[KnowledgeRecord, ...]:
@@ -355,14 +488,20 @@ def _build_content_hash(
     *,
     manifest_sha256: str,
     persona_sha256: str,
+    prompt_sha256: str,
     knowledge_sha256: str,
+    evaluation_sha256: str,
+    theme_sha256: str,
 ) -> str:
     digest = hashlib.sha256()
     digest.update(b"character-pack-v1\0")
     for label, value in (
         ("manifest", manifest_sha256),
         ("persona", persona_sha256),
+        ("prompt", prompt_sha256),
         ("knowledge", knowledge_sha256),
+        ("evaluation", evaluation_sha256),
+        ("theme", theme_sha256),
     ):
         digest.update(label.encode("ascii"))
         digest.update(b"\0")
@@ -382,7 +521,10 @@ def validate_character_pack(pack_dir: str | Path) -> ValidatedCharacterPack:
     manifest_bytes = manifest_path.read_bytes()
     manifest = load_pack_manifest(manifest_path)
     persona_path = _resolve_pack_file(root, manifest.persona_path)
+    prompt_path = _resolve_pack_file(root, manifest.prompt_path)
     knowledge_path = _resolve_pack_file(root, manifest.knowledge_path)
+    evaluation_path = _resolve_pack_file(root, manifest.evaluation_path)
+    theme_path = _resolve_pack_file(root, manifest.theme_path)
 
     persona_bytes = persona_path.read_bytes()
     if not persona_bytes.strip():
@@ -392,21 +534,59 @@ def validate_character_pack(pack_dir: str | Path) -> ValidatedCharacterPack:
             f"Persona file exceeds the {MAX_PERSONA_BYTES}-byte validation limit."
         )
 
+    prompt_bytes = prompt_path.read_bytes()
+    if not prompt_bytes.strip():
+        raise PackValidationError("Prompt file must not be empty.")
+    if len(prompt_bytes) > MAX_PROMPT_BYTES:
+        raise PackValidationError(
+            f"Prompt file exceeds the {MAX_PROMPT_BYTES}-byte validation limit."
+        )
+
+    try:
+        persona = persona_bytes.decode("utf-8")
+        prompt = prompt_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise PackValidationError("Persona and prompt files must be valid UTF-8.") from exc
+    if "\x00" in persona or "\x00" in prompt:
+        raise PackValidationError("Persona and prompt files must not contain NUL bytes.")
+
     records = load_knowledge_records(knowledge_path)
+    evaluation = load_evaluation_suite(evaluation_path)
+    theme = load_pack_theme(theme_path)
+    record_ids = {record.id for record in records}
+    for case in evaluation.cases:
+        missing = sorted(set(case.expected_record_ids) - record_ids)
+        if missing:
+            raise PackValidationError(
+                f"Evaluation case {case.id!r} references unknown records: {missing}."
+            )
     manifest_sha256 = _sha256_bytes(manifest_bytes)
     persona_sha256 = _sha256_bytes(persona_bytes)
+    prompt_sha256 = _sha256_bytes(prompt_bytes)
     knowledge_sha256 = _sha256_bytes(knowledge_path.read_bytes())
+    evaluation_sha256 = _sha256_bytes(evaluation_path.read_bytes())
+    theme_sha256 = _sha256_bytes(theme_path.read_bytes())
 
     return ValidatedCharacterPack(
         root=root,
         manifest=manifest,
         records=records,
+        persona=persona,
+        prompt=prompt,
+        evaluation=evaluation,
+        theme=theme,
         manifest_sha256=manifest_sha256,
         persona_sha256=persona_sha256,
+        prompt_sha256=prompt_sha256,
         knowledge_sha256=knowledge_sha256,
+        evaluation_sha256=evaluation_sha256,
+        theme_sha256=theme_sha256,
         content_hash=_build_content_hash(
             manifest_sha256=manifest_sha256,
             persona_sha256=persona_sha256,
+            prompt_sha256=prompt_sha256,
             knowledge_sha256=knowledge_sha256,
+            evaluation_sha256=evaluation_sha256,
+            theme_sha256=theme_sha256,
         ),
     )

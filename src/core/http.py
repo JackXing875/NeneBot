@@ -12,7 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.core.exceptions import NeneBotError
+from src.core.exceptions import PersonaStudioError
 from src.core.metrics import http_request_duration_ms, http_requests_total
 from src.core.request_context import get_request_id, reset_request_id, set_request_id
 from src.core.tracing import traced_span
@@ -129,7 +129,10 @@ async def validation_exception_handler(
     )
 
 
-async def nenebot_exception_handler(request: Request, exc: NeneBotError) -> JSONResponse:
+async def application_exception_handler(
+    request: Request,
+    exc: PersonaStudioError,
+) -> JSONResponse:
     """Preserve explicit business error codes and status codes."""
     return JSONResponse(
         status_code=exc.status_code,

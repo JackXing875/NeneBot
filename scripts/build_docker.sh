@@ -1,7 +1,7 @@
 #!/bin/bash
 # Helper script to build the Docker image locally.
 
-IMAGE_NAME="ningning-rag-api"
+IMAGE_NAME="persona-studio"
 TAG="latest"
 
 echo "Building Docker image: ${IMAGE_NAME}:${TAG}..."

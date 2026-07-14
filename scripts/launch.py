@@ -1,4 +1,4 @@
-"""Thin wrapper around the unified NeneBot launcher."""
+"""Thin wrapper around the unified Persona Studio launcher."""
 
 from __future__ import annotations
 

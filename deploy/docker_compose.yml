@@ -13,7 +13,6 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - vector_store:/app/vector_store
       - huggingface_cache:/home/appuser/.cache/huggingface
 
   redis:
@@ -26,5 +25,4 @@ services:
 
 volumes:
   redis_data:
-  vector_store:
   huggingface_cache:

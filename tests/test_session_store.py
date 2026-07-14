@@ -56,7 +56,7 @@ def test_redis_session_store_persists_and_clears() -> None:
         {"role": "assistant", "content": "world"},
     ]
     assert store.get_preferred_language(session_id) == "en"
-    assert client.ttl(f"nenebot:session:{session_id}") > 0
+    assert client.ttl(f"persona-studio:session:{session_id}") > 0
 
     store.clear(session_id)
     assert store.get_history(session_id) == []
@@ -106,7 +106,7 @@ def test_redis_session_store_retries_conflicts_and_refreshes_ttl(monkeypatch) ->
 
     assert conflict_raised is True
     assert store.get_history(SESSION_ID)[-1]["content"] == "world"
-    assert 0 < client.ttl(f"nenebot:session:{SESSION_ID}") <= 60
+    assert 0 < client.ttl(f"persona-studio:session:{SESSION_ID}") <= 60
 
 
 def test_redis_session_store_preserves_concurrent_turns() -> None:
@@ -131,7 +131,7 @@ def test_redis_session_store_preserves_concurrent_turns() -> None:
     assert {item["content"] for item in history if item["role"] == "user"} == {
         f"user-{index}" for index in range(10)
     }
-    assert 0 < client.ttl(f"nenebot:session:{OTHER_SESSION_ID}") <= 60
+    assert 0 < client.ttl(f"persona-studio:session:{OTHER_SESSION_ID}") <= 60
 
 
 def test_session_stores_accept_uuid_and_internal_telegram_ids() -> None:

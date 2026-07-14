@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "pack_id": "mira-demo",
+  "version": "1.0.0",
+  "display_name": "米拉 / Mira",
+  "default_locale": "zh-CN",
+  "persona_path": "persona.md",
+  "prompt_path": "prompt.md",
+  "knowledge_path": "knowledge.jsonl",
+  "evaluation_path": "evaluation.json",
+  "theme_path": "theme.json",
+  "provenance": {
+    "creator": "Persona Studio contributors",
+    "source": "Original demo Pack authored for this repository",
+    "license": "CC0-1.0",
+    "rights": "owned"
+  }
+}

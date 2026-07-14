@@ -1,14 +1,14 @@
-"""Custom exception classes for the NeneBot application."""
+"""Custom exception classes for Persona Studio."""
 
 
-class NeneBotError(Exception):
-    """Base exception for all NeneBot related errors."""
+class PersonaStudioError(Exception):
+    """Base exception for explicit application errors."""
 
     def __init__(
         self,
         message: str,
         *,
-        code: str = "nenebot_error",
+        code: str = "persona_studio_error",
         status_code: int = 500,
     ) -> None:
         super().__init__(message)
@@ -17,29 +17,29 @@ class NeneBotError(Exception):
         self.status_code = status_code
 
 
-class VectorStoreError(NeneBotError):
+class VectorStoreError(PersonaStudioError):
     """Raised when vector database operations fail."""
 
 
-class LLMInferenceError(NeneBotError):
+class LLMInferenceError(PersonaStudioError):
     """Raised when the LLM service (Ollama) returns an error."""
 
 
-class RateLimitExceededError(NeneBotError):
+class RateLimitExceededError(PersonaStudioError):
     """Raised when a caller exceeds the configured request budget."""
 
     def __init__(self, message: str = "Too many requests.") -> None:
         super().__init__(message, code="rate_limited", status_code=429)
 
 
-class AuthenticationError(NeneBotError):
+class AuthenticationError(PersonaStudioError):
     """Raised when a protected API is accessed without valid credentials."""
 
     def __init__(self, message: str = "Valid API token required.") -> None:
         super().__init__(message, code="auth_required", status_code=401)
 
 
-class AuthorizationError(NeneBotError):
+class AuthorizationError(PersonaStudioError):
     """Raised when a caller lacks the required permission scope."""
 
     def __init__(self, message: str = "API token lacks required scope.") -> None:

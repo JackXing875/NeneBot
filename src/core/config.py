@@ -57,17 +57,15 @@ class Settings(BaseSettings):
     app_env: AppEnvironment = "dev"
 
     # --- API ---
-    api_title: str = "NeneBot API"
+    api_title: str = "Persona Studio API"
     api_version: str = "0.7.0b1"
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65_535)  # Overridden by PORT env var on Railway
     cors_allow_origins: str = "*"  # Comma-separated origins or "*" for all
-    max_knowledge_import_bytes: int = Field(default=2_097_152, gt=0, le=52_428_800)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
 
     # --- Embedding Model ---
     embedding_model_name: str = "BAAI/bge-small-zh-v1.5"
-    vector_dim: int = Field(default=512, gt=0, le=4_096)
 
     # --- LLM Provider ---
     llm_provider: LLMProvider = "ollama"
@@ -92,10 +90,11 @@ class Settings(BaseSettings):
     llm_max_tokens_openai: int = Field(default=512, gt=0, le=32_768)
 
     # --- Storage Paths ---
-    data_path: str = str(PROJECT_ROOT / "data" / "raw" / "train.jsonl")
-    vector_index_path: str = str(PROJECT_ROOT / "vector_store" / "faiss_index.bin")
-    knowledge_meta_path: str = str(PROJECT_ROOT / "vector_store" / "knowledge_base.json")
     frontend_dist_dir: str = str(PROJECT_ROOT / "frontend" / "dist")
+
+    # --- Character Pack runtime ---
+    active_pack_id: str = "mira-demo"
+    artifact_store_path: str = str(PROJECT_ROOT / "artifacts")
 
     # --- RAG ---
     match_threshold: float = Field(default=0.55, ge=0.0, le=1.0)
@@ -114,7 +113,7 @@ class Settings(BaseSettings):
     api_auth_registry_path: str = str(PROJECT_ROOT / "config" / "api_tokens.json")
     api_auth_header_name: str = "Authorization"
     tracing_enabled: bool = False
-    tracing_service_name: str = "nenebot"
+    tracing_service_name: str = "persona-studio"
     tracing_exporter: str = "console"  # console | noop
     llm_timeout_seconds: float = Field(default=120.0, gt=0.0, le=600.0)
     llm_max_retries: int = Field(default=2, ge=0, le=10)

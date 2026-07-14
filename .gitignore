@@ -217,16 +217,14 @@ venv/
 env/
 .env
 
-# Runtime state and generated/private datasets
+# Runtime state and generated/private content
+/artifacts/
+/private/
+/packs/private/
 /vector_store/
 !src/infrastructure/vector_store/
 !src/infrastructure/vector_store/*.py
 /config/api_tokens.json
-/data/backups/
-/data/processed/
-/data/raw/nene_finetune.jsonl
-/data/raw/nene_ks_*.json
-/data/raw/nene_ks_*.jsonl
 
 # Model files
 models/

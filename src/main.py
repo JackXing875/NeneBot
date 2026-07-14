@@ -22,11 +22,11 @@ from src.api.admin import admin_router
 from src.api.routers import chat_router
 from src.core.auth import require_api_scope
 from src.core.config import settings
-from src.core.exceptions import NeneBotError
+from src.core.exceptions import PersonaStudioError
 from src.core.http import (
     RequestContextMiddleware,
+    application_exception_handler,
     http_exception_handler,
-    nenebot_exception_handler,
     unhandled_exception_handler,
     validation_exception_handler,
 )
@@ -55,6 +55,8 @@ async def build_runtime_health(app: FastAPI) -> dict[str, object]:
         session_backend_name=getattr(session_store, "backend_name", "unknown"),
         session_backend_ok=session_ok,
         session_backend_error=session_error,
+        character=getattr(app.state, "character", None),
+        artifact=getattr(app.state, "artifact", None),
     )
 
 
@@ -63,7 +65,7 @@ def public_readiness_payload(health: dict[str, object]) -> dict[str, object]:
     return {
         "status": health.get("status", "degraded"),
         "ready": bool(health.get("ready")),
-        "service": "nenebot",
+        "service": "persona-studio",
         "timestamp": health.get("timestamp"),
     }
 
@@ -71,13 +73,15 @@ def public_readiness_payload(health: dict[str, object]) -> dict[str, object]:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize all services on startup; release resources on shutdown."""
-    logger.info("NeneBot starting up…")
+    logger.info("Persona Studio starting up…")
     services: RuntimeServices = build_runtime_services()
     app.state.embedding_svc = services.embedding_svc
     app.state.vector_store = services.vector_store
     app.state.rag_pipeline = services.rag_pipeline
     app.state.llm_client = services.llm_client
     app.state.session_store = services.session_store
+    app.state.character = services.character
+    app.state.artifact = services.artifact
     app.state.telegram_runner = None
 
     if settings.telegram_bot_token:
@@ -89,14 +93,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     logger.info("All services ready.")
     yield
-    logger.info("NeneBot shutting down.")
+    logger.info("Persona Studio shutting down.")
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.api_title,
         version=settings.api_version,
-        description="RAG-powered conversational API for Ayachi Nene.",
+        description="Pack-driven conversational runtime for Persona Studio.",
         lifespan=lifespan,
     )
 
@@ -111,7 +115,10 @@ def create_app() -> FastAPI:
 
     app.add_exception_handler(HTTPException, http_exception_handler)  # type: ignore[arg-type]
     app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(NeneBotError, nenebot_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(
+        PersonaStudioError,
+        application_exception_handler,  # type: ignore[arg-type]
+    )
     app.add_exception_handler(Exception, unhandled_exception_handler)
 
     # API routes

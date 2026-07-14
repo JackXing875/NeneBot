@@ -1,172 +1,133 @@
 # Persona Studio
 
-> NeneBot 0.7 迁移预览——本地优先、可审计的 Character Agent Studio / Runtime。
+> 本地优先、重视内容权利、检索结果可追溯的 Character Pack 运行时。
 
-[English](README.md) · [迁移路线](MEMORY.md) ·
-[Character Pack v1](docs/character-packs.md)
+[English](README.md) · [Character Pack v1](docs/character-packs.md) ·
+[私有迁移指南](docs/private-pack-migration.md) · [长期路线](MEMORY.md)
 
-这个仓库正在从“绑定单一角色的 RAG 对话 Demo”逐步重构为通用角色 Agent 平台，用来编写、
-校验、测试和运行用户有权使用的角色内容。迁移不会一次性推倒重来：0.7 分支仍保留兼容运行时，
-新的内容边界与运行时边界会分阶段接管旧系统。
+Persona Studio 把角色内容与聊天运行时彻底分开。persona、prompt、知识、检索评测、主题、
+来源、许可证和安全审核统一放在严格的 Character Pack 中；离线构建器把 Pack 编译成经过完整性
+校验的 FAISS Artifact，Web 与 Telegram 运行时只读取明确发布的 Artifact。
 
-## 当前已经有什么
+仓库只附带一个原创、使用 CC0 许可的演示 Pack：**米拉（Mira）**。她是架空档案馆的夜班
+引导员，使用代码生成的首字母头像；仓库不再附带第三方角色美术或对白语料。
 
-下面描述的是现有 0.7 兼容运行时，不是已经完成的 Studio：
+## Phase 1 已实现
 
-- FastAPI 后端，以及旧的 `POST /v1/chat`、`POST /v1/chat/stream` 接口；
-- 增量 SSE 输出、请求限流、带 scope 的 token 鉴权和运维探针；
-- Vue/Vite 对话页与偏运维用途的后台页面；
-- Ollama、Anthropic 和 OpenAI-compatible LLM 适配器；
-- 旧版 FAISS / sentence-transformers 检索链路；
-- 默认进程内会话历史，以及可选 Redis 后端；
-- 严格的 Character Pack JSON v1 校验和不可变 Artifact 暂存、发布基础设施。
+- 严格 Pack 校验：拒绝重复 key、路径穿越、符号链接、超限文件和未知字段；
+- 逐条知识与整个 Pack 的 canonical SHA-256；
+- 每条知识都必须声明来源、许可、权利基础并完成安全审核；
+- 离线构建 FAISS Artifact，并在检索 metadata 中保留完整来源；
+- Pack 自带确定性的检索评测集；
+- 内容寻址的 Artifact 版本、完整性复验、原子发布和回滚；
+- 通过派生新 Pack 版本按精确来源清退记录，再走相同构建流程；
+- 只读的 `/v1/chat`、`/v1/chat/stream`、`/v1/character` 运行接口；
+- 同步与 SSE 响应均返回引用元数据；
+- 不依赖角色图片的 Vue 对话页，以及只读 Artifact 运维面板。
 
-Character Pack 与版本化 Artifact 目前只是已经落地的基础层：`/v1/chat` 尚未默认从 Pack 加载内容，
-前端也还不是完整的 Pack 编辑器。旧 RAG 接口会作为兼容层保留到新链路完成接管。
+旧在线知识导入与重建 URL 固定返回 HTTP `410`，内容无法绕过 Pack / Artifact 边界进入运行时。
 
-旧版在线知识导入与索引重建接口默认关闭。新的内容应先离线校验、构建，再发布为不可变 Artifact。
-已实现的 schema、来源记录、完整性校验、原子发布方式和当前限制见
-[Character Pack 与 Artifact v1](docs/character-packs.md)。
+## 快速开始
 
-## 目标方向
-
-最终产品是围绕单一版本化 Character Pack 边界构建的模块化、本地优先 Persona Studio：
-
-- persona、prompt、examples、knowledge、theme、eval，以及来源、许可和安全元数据一起版本化；
-- 离线构建器负责内容校验，并发布可追溯、可回滚的 Artifact；
-- Web 兼容 API 与经过明确授权的外部渠道共用一个 Agent Kernel；
-- 类型化事件和经过 policy 校验的动作支持审计与回放；
-- Studio 提供 Pack 审核、评测、发布与回滚；
-- 群聊模拟器先离线评测决策，达标后才可能连接真实发送渠道；
-- 长期记忆和自主外部集成之前，先完成同意、保留、查看与删除等隐私能力。
-
-这些是分阶段目标，不是当前版本的功能承诺。详细决策、进度和验收标准记录在
-[MEMORY.md](MEMORY.md)。
-
-## 安全的本地快速启动
-
-需要准备：
-
-- Python 3.10 或更高版本；
-- Node.js 22.12 或更高版本，以及 npm；
-- 一个可访问的 LLM 后端。默认本地开发配置使用 Ollama。
-
-先创建隔离的后端环境和本地配置：
+需要 Python 3.10+、Node.js 22.12+、npm，以及一个可访问的 LLM provider。开发环境默认使用
+Ollama。
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 python -m pip install -r requirements.txt
+python -m pip install -e . --no-deps
 cp .env.example .env
-```
 
-Windows 可使用 `venv\Scripts\activate` 激活环境。启动前请检查 `.env`，只填写实际使用的
-provider 配置；不要提交 `.env` 或 API Key。如果沿用默认 Ollama 配置，请先安装对应模型并确认
-Ollama 服务已经运行。
-
-使用 lockfile 安装前端依赖：
-
-```bash
 cd frontend
 npm ci
 cd ..
 ```
 
-在一个终端中仅监听本机地址启动后端：
+启动运行时前，先构建、发布并评测演示 Pack：
 
 ```bash
-source venv/bin/activate
-python scripts/launch.py local --host 127.0.0.1 --reload
+persona pack validate packs/demo
+persona pack build packs/demo
+persona pack promote mira-demo 1.0.0
+persona pack eval packs/demo
 ```
 
-另开终端启动前端：
+同时启动前后端：
 
 ```bash
-cd frontend
-npm run dev
+persona dev --host 127.0.0.1
 ```
 
-浏览器访问 `http://localhost:5173`；API 文档位于 `http://127.0.0.1:8000/docs`。
+浏览器访问 `http://localhost:5173`。API 位于 `http://127.0.0.1:8000`，接口文档在 `/docs`。
+`persona local --host 127.0.0.1` 只启动后端。
 
-如果希望用一个本地端口提供编译后的前端与 API，可以先构建前端，再启动不带热重载的后端：
+## Pack 发布流程
 
 ```bash
-cd frontend
-npm ci
-npm run build
-cd ..
-source venv/bin/activate
-python scripts/launch.py local --host 127.0.0.1
+# 1. 校验所有源文件。
+persona pack validate path/to/pack
+
+# 2. 安装不可变 Artifact，但不改变运行时当前版本。
+persona pack build path/to/pack --artifact-version 1.1.0
+
+# 3. 使用精确版本、完整 hash 或 Artifact 目录名发布。
+persona pack promote my-pack 1.1.0
+
+# 4. 使用 Pack 中的 fixtures 评测当前 Artifact。
+persona pack eval path/to/pack
+
+# 5. 回到上一个已安装版本。
+persona pack rollback my-pack
 ```
 
-随后访问 `http://127.0.0.1:8000`。
+清退某个来源时，不要直接修改活动索引，而应派生一个新 Pack：
 
-### 鉴权与网络暴露
-
-开发示例默认关闭鉴权，便于仅在 loopback 上调试。绑定非本机地址之前，应在 `.env` 中启用鉴权，
-并配置彼此独立的 scope token；也可以复制
-[config/api_tokens.json.example](config/api_tokens.json.example) 作为本地 registry：
-
-```env
-API_AUTH_ENABLED=true
-API_AUTH_TOKENS=local-chat|chat:replace-this,local-ops|ops:replace-this-too
-CORS_ALLOW_ORIGINS=https://your-ui.example
+```bash
+persona pack derive private/my-pack \
+  --exclude-source "licensed/source-a.jsonl" \
+  --output private/my-pack-1.2.0 \
+  --version 1.2.0
+persona pack build private/my-pack-1.2.0
 ```
 
-鉴权开启但没有有效 token 时，服务会拒绝受保护请求，不会静默降级。所有 token 都应按密钥管理。
-生产配置还要求使用 Redis 会话；开发环境默认的进程内历史不会持久保存。
+`private/`、`packs/private/` 和生成的 `artifacts/` 默认被 Git 忽略；`derive` 永远不会修改源 Pack。
 
-## 运维端点
+## API 与运维
 
-规范端点如下：
+| 端点 | 用途 |
+| --- | --- |
+| `GET /v1/character` | 当前 Pack 身份、主题和权利信息 |
+| `POST /v1/chat` | 带可追溯引用的兼容聊天 API |
+| `POST /v1/chat/stream` | meta/chunk/error/done SSE 流 |
+| `GET /livez` | 公开进程存活探针 |
+| `GET /readyz` | 公开最小就绪探针 |
+| `GET /ops/health` | 受保护的详细诊断 |
+| `GET /admin/api/knowledge/overview` | 受保护的只读 Artifact / 版本视图 |
 
-| 端点 | 访问要求 | 含义 |
-| --- | --- | --- |
-| `GET /livez` | 公开 | 最小化进程存活状态 |
-| `GET /readyz` | 公开 | 最小化就绪状态；依赖未就绪时返回 `503` |
-| `GET /ops/health` | 开启鉴权后需要 `ops` scope | 详细运行状态与诊断信息 |
-
-`/health`、`/health/live`、`/health/ready` 仅作为已弃用的兼容别名保留。详细 health 与 metrics
-可能暴露运维信息，不应在缺少访问控制时公开到不可信网络。
+启用鉴权时，应使用彼此独立的 `chat` 与 `ops` scope 凭据；生产环境要求 Redis 会话。使用云端
+LLM 时，用户消息、Pack prompt 和检索片段可能被发送给服务商，处理敏感内容前应获得知情同意并
+检查服务商的数据保留条款。
 
 ## 验证
-
-安装前后端依赖后，运行统一检查：
 
 ```bash
 ./scripts/run_linter.sh
 ```
 
-它会检查格式、lint、后端与脚本的严格类型、后端测试，以及前端生产构建。测试通过只能证明测试
-覆盖到的行为，不能证明回答没有错误、角色一定一致、内容一定安全，也不能证明数据拥有合法授权。
-
-## 迁移、隐私与内容授权
-
-- 仓库中可能仍有等待 Phase 1 迁移的第三方角色数据、剧本或美术。除非你已独立确认再分发权利，
-  应把这些文件当作本地私有迁移输入；代码许可证不会自动授予第三方内容的使用权。
-- 只导入自己拥有、获得许可或依法可以使用的材料。Character Pack 必须保留来源、许可证、权利
-  基础、安全审核与内容 hash。
-- 使用云端 LLM 时，用户消息、prompt 和检索片段可能被发送给服务商。处理敏感内容前应获得明确
-  同意，并检查服务商的数据使用与保留政策。
-- 0.7 会话层只是兼容设施，不是完整隐私系统。持久记忆、用户查看/导出/删除、同意和保留期限
-  仍属于迁移工作。
-- Telegram 等外部渠道必须得到运营者和参与者的明确授权。不要把当前开发运行时作为自主 Agent
-  直接接入真实社群。
-- 后续版本删除工作树中的文件，并不会抹除 Git 历史。历史重写、凭据轮换和公开再分发都需要
-  独立的运维决策。
-
-以上是工程迁移提示，不构成法律意见。
+该命令执行 Ruff 格式/lint、严格 mypy、后端测试和前端生产构建。测试不能代替内容事实核验或
+法律审核；只应发布自己拥有、已获许可或依法可使用的内容。
 
 ## 仓库结构
 
 ```text
-src/                 FastAPI 兼容运行时与新的 knowledge 基础层
-frontend/            Vue/Vite 兼容客户端
-src/knowledge/       Character Pack 校验与不可变 Artifact 工具
-docs/                迁移期格式与运维说明
-scripts/             启动、迁移、评测与仓库检查脚本
-tests/               后端与 ASGI 回归测试
-MEMORY.md            长期路线、架构决策与实施日志
+packs/demo/          原创公开演示 Pack
+src/knowledge/       Pack、构建器、Artifact Store 与运行时契约
+src/                 FastAPI 运行时和适配器
+frontend/            Pack 驱动的对话页和只读运维面板
+docs/                格式与私有迁移指南
+tests/               单元、ASGI 与端到端契约测试
+MEMORY.md            长期路线与实施记录
 ```
 
-源码使用 [GPL-3.0](LICENSE) 发布；第三方内容授权必须与软件许可证分开核查。
+源码使用 [GPL-3.0](LICENSE)；Pack 内容使用其 manifest 中独立声明的许可和来源。

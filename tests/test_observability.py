@@ -62,7 +62,7 @@ def test_build_liveness_payload_is_always_ok() -> None:
     payload = build_liveness_payload()
 
     assert payload["status"] == "ok"
-    assert payload["service"] == "nenebot"
+    assert payload["service"] == "persona-studio"
 
 
 def test_request_context_middleware_sets_request_id_header() -> None:

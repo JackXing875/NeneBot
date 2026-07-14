@@ -1,4 +1,4 @@
-"""Telegram long-polling adapter for NeneBot."""
+"""Telegram long-polling adapter for the active Character Pack."""
 
 import asyncio
 from dataclasses import dataclass
@@ -183,7 +183,12 @@ class TelegramBotRunner:
         command = message.text.split()[0].split("@")[0].lower()
 
         if command == "/start":
-            return "你好呀，我是宁宁。\n直接和我聊天就可以了。\n可用命令：/help /reset /model"
+            name = (
+                self.services.character.display_name
+                if self.services.character is not None
+                else "当前角色"
+            )
+            return f"你好，我是{name}。\n直接发送文字即可开始聊天。\n可用命令：/help /reset /model"
         if command == "/help":
             return (
                 "使用说明：\n"

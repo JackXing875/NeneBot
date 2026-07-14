@@ -7,15 +7,8 @@
 
 !src/
 !src/**
-!scripts/
-!scripts/**
-
-!data/
-!data/prompts.yaml
-!data/persona/
-!data/persona/**
-!data/raw/
-!data/raw/train.jsonl
+!packs/
+!packs/**
 
 !frontend/
 !frontend/package.json
@@ -24,8 +17,6 @@
 !frontend/admin.html
 !frontend/vite.config.js
 !frontend/tailwind.config.js
-!frontend/public/
-!frontend/public/**
 !frontend/src/
 !frontend/src/**
 

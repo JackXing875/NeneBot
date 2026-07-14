@@ -1,3 +1,7 @@
+from pathlib import Path
+
+from src.knowledge.pack import validate_character_pack
+from src.knowledge.runtime import RuntimeCharacter
 from src.services.rag_pipeline import RAGPipeline
 
 
@@ -8,63 +12,57 @@ class DummyVectorStore:
 
 class DummyEmbeddingService:
     def encode(self, texts, batch_size=32):  # type: ignore[no-untyped-def]
-        return [[0.0] * 512 for _ in texts]
+        return [[0.0] * 32 for _ in texts]
 
 
-def test_build_messages_uses_nene_character_card_and_reference_block() -> None:
-    pipeline = RAGPipeline(
+def demo_character() -> RuntimeCharacter:
+    root = Path(__file__).resolve().parents[1]
+    return RuntimeCharacter.from_pack(validate_character_pack(root / "packs" / "demo"))
+
+
+def build_pipeline() -> RAGPipeline:
+    return RAGPipeline(
         vector_store=DummyVectorStore(),  # type: ignore[arg-type]
         embedding_svc=DummyEmbeddingService(),  # type: ignore[arg-type]
+        character=demo_character(),
     )
 
-    messages = pipeline.build_messages(
-        query="今天有点累",
+
+def test_build_messages_uses_pack_prompt_persona_and_provenance() -> None:
+    messages = build_pipeline().build_messages(
+        query="为什么知识要记录来源？",
         context_results=[
             {
-                "query_text": "今天有点累",
-                "bot_response": "如果累了的话，就先休息一下吧，保科君。",
+                "record_id": "source-traceability",
+                "query_text": "为什么知识要记录来源？",
+                "bot_response": "因为来源让内容能够核验。",
                 "similarity_score": 0.91,
+                "provenance": {
+                    "source": "packs/demo/knowledge.jsonl",
+                    "license": "CC0-1.0",
+                },
             }
         ],
     )
 
+    system_prompt = messages[0]["content"]
     assert messages[0]["role"] == "system"
-    assert "绫地宁宁" in messages[0]["content"]
-    assert "不直接照搬" in messages[0]["content"]
-    assert "参考样本" in messages[0]["content"]
-    assert "角色补充参考" in messages[0]["content"]
-    assert "脸皮非常薄" in messages[0]["content"]
-    assert "回应\n7." in messages[0]["content"]
-    assert "为准\n8." in messages[0]["content"]
-    assert messages[-1] == {"role": "user", "content": "今天有点累"}
+    assert "原创角色“米拉 / Mira”" in system_prompt
+    assert "折光档案馆并非现实组织" in system_prompt
+    assert "source-traceability" in system_prompt
+    assert "source=packs/demo/knowledge.jsonl" in system_prompt
+    assert "license=CC0-1.0" in system_prompt
+    assert messages[-1] == {"role": "user", "content": "为什么知识要记录来源？"}
 
 
-def test_build_messages_includes_response_language_instruction() -> None:
-    pipeline = RAGPipeline(
-        vector_store=DummyVectorStore(),  # type: ignore[arg-type]
-        embedding_svc=DummyEmbeddingService(),  # type: ignore[arg-type]
-    )
-
-    messages = pipeline.build_messages(
+def test_build_messages_includes_response_language_and_history() -> None:
+    messages = build_pipeline().build_messages(
         query="please use English",
         context_results=[],
+        history=[{"role": "assistant", "content": "之前的回复"}],
         response_language="en",
     )
 
-    assert "本轮请使用English自然回复" in messages[0]["content"]
-
-
-def test_build_messages_uses_persona_markdown_as_background_reference() -> None:
-    pipeline = RAGPipeline(
-        vector_store=DummyVectorStore(),  # type: ignore[arg-type]
-        embedding_svc=DummyEmbeddingService(),  # type: ignore[arg-type]
-    )
-
-    messages = pipeline.build_messages(
-        query="有人突然开了个很怪的玩笑",
-        context_results=[],
-    )
-
-    system_prompt = messages[0]["content"]
-    assert "不擅长接那种“荒谬”或者“抽象”的梗" in system_prompt
-    assert "不要把回复写成人物简介或设定说明" in system_prompt
+    assert "本轮使用 English" in messages[0]["content"]
+    assert "不要虚构 Pack 事实" in messages[0]["content"]
+    assert messages[1] == {"role": "assistant", "content": "之前的回复"}

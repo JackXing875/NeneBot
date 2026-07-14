@@ -1,12 +1,12 @@
 @echo off
 :: Set console to UTF-8 encoding to prevent character issues
 chcp 65001 >nul
-title NeneBot - One-Click Startup
+title Persona Studio - One-Click Startup
 color 0D
 
 echo =======================================================
 echo.
-echo                 NeneBot Startup Utility
+echo                 Persona Studio Startup Utility
 echo.
 echo        Initializing environment and services...
 echo.
@@ -48,6 +48,12 @@ if not exist "venv" (
 call venv\Scripts\activate
 echo    - Installing/updating backend dependencies...
 pip install -r requirements.txt -q
+pip install -e . --no-deps -q
+
+echo    - Validating and building the demo Character Pack...
+persona pack validate packs/demo
+persona pack build packs/demo
+persona pack promote mira-demo 1.0.0
 
 echo Backend environment ready.
 
@@ -76,10 +82,10 @@ echo [5/5] Launching backend and frontend services...
 echo.
 
 :: Start backend service in a new terminal window
-start "NeneBot Backend Service" cmd /c "venv\Scripts\activate && python -m src.main"
+start "Persona Studio Backend" cmd /c "venv\Scripts\activate && python -m src.main"
 
 :: Start frontend service in a new terminal window
-start "NeneBot Frontend Service" cmd /c "cd frontend && npm run dev"
+start "Persona Studio Frontend" cmd /c "cd frontend && npm run dev"
 
 :: Wait 3 seconds before opening browser
 echo Waiting for services to initialize...

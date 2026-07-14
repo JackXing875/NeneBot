@@ -25,6 +25,7 @@ class EmbeddingService:
 
     def __init__(self) -> None:
         """Initializes the EmbeddingService and loads the model into memory."""
+        self.model_name = settings.embedding_model_name
         # Automatically detect if a GPU is available, fallback to CPU for WSL/local
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Loading embedding model: {settings.embedding_model_name}")

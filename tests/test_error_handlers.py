@@ -3,10 +3,10 @@ import asyncio
 from fastapi import HTTPException
 from starlette.requests import Request
 
-from src.core.exceptions import NeneBotError
+from src.core.exceptions import PersonaStudioError
 from src.core.http import (
+    application_exception_handler,
     http_exception_handler,
-    nenebot_exception_handler,
     unhandled_exception_handler,
 )
 from src.core.request_context import reset_request_id, set_request_id
@@ -52,12 +52,16 @@ def test_unhandled_exception_uses_internal_error_envelope() -> None:
     assert '"request_id":"req-internal"' in payload
 
 
-def test_nenebot_exception_preserves_business_code() -> None:
+def test_application_exception_preserves_business_code() -> None:
     token = set_request_id("req-biz")
     response = asyncio.run(
-        nenebot_exception_handler(
+        application_exception_handler(
             make_request(),
-            NeneBotError("provider unavailable", code="llm_unavailable", status_code=503),
+            PersonaStudioError(
+                "provider unavailable",
+                code="llm_unavailable",
+                status_code=503,
+            ),
         )
     )
     reset_request_id(token)

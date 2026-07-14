@@ -27,12 +27,12 @@ def test_resolve_env_files_uses_selected_env(monkeypatch) -> None:
     assert resolve_env_files() == (".env", ".env.prod")
 
 
-def test_settings_allow_data_path_override(monkeypatch) -> None:
-    monkeypatch.setenv("DATA_PATH", "/tmp/custom-train.jsonl")
+def test_settings_allow_artifact_store_override(monkeypatch) -> None:
+    monkeypatch.setenv("ARTIFACT_STORE_PATH", "/tmp/custom-artifacts")
 
     settings = Settings(_env_file=None)
 
-    assert settings.data_path == "/tmp/custom-train.jsonl"
+    assert settings.artifact_store_path == "/tmp/custom-artifacts"
 
 
 @pytest.mark.parametrize(

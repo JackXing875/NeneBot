@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import shutil
 import subprocess
 import sys
@@ -11,16 +12,22 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING, Sequence
 
 from src.adapters.telegram import main as telegram_main
 from src.core.config import PROJECT_ROOT, settings
+
+if TYPE_CHECKING:
+    from src.services.embedding_svc import EmbeddingService
+
+DEFAULT_PACK_PATH = PROJECT_ROOT / "packs" / "demo"
+DEFAULT_ARTIFACT_STORE = PROJECT_ROOT / "artifacts"
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
-        description="Unified runtime launcher for NeneBot.",
+        description="Persona Studio runtime and offline Character Pack tools.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -55,6 +62,65 @@ def build_parser() -> argparse.ArgumentParser:
         help="Seconds to wait for backend health endpoint (first run may need 1–2 min).",
     )
     dev_parser.set_defaults(handler=run_dev)
+
+    pack_parser = subparsers.add_parser(
+        "pack",
+        help="Validate, build, evaluate, promote, or roll back Character Packs.",
+    )
+    pack_commands = pack_parser.add_subparsers(dest="pack_command", required=True)
+
+    validate_parser = pack_commands.add_parser("validate", help="Validate every Pack input.")
+    validate_parser.add_argument("pack_dir", nargs="?", default=str(DEFAULT_PACK_PATH))
+    validate_parser.set_defaults(handler=run_pack_validate)
+
+    build_pack_parser = pack_commands.add_parser(
+        "build",
+        help="Build and install an immutable artifact without activating it.",
+    )
+    build_pack_parser.add_argument("pack_dir", nargs="?", default=str(DEFAULT_PACK_PATH))
+    build_pack_parser.add_argument("--store", default=str(DEFAULT_ARTIFACT_STORE))
+    build_pack_parser.add_argument("--artifact-version")
+    build_pack_parser.set_defaults(handler=run_pack_build)
+
+    eval_parser = pack_commands.add_parser(
+        "eval",
+        help="Evaluate the active artifact against its Pack retrieval cases.",
+    )
+    eval_parser.add_argument("pack_dir", nargs="?", default=str(DEFAULT_PACK_PATH))
+    eval_parser.add_argument("--store", default=str(DEFAULT_ARTIFACT_STORE))
+    eval_parser.set_defaults(handler=run_pack_eval)
+
+    promote_parser = pack_commands.add_parser(
+        "promote",
+        help="Atomically activate an installed artifact.",
+    )
+    promote_parser.add_argument("pack_id")
+    promote_parser.add_argument("reference", help="Full hash, exact version, or directory name.")
+    promote_parser.add_argument("--store", default=str(DEFAULT_ARTIFACT_STORE))
+    promote_parser.set_defaults(handler=run_pack_promote)
+
+    rollback_parser = pack_commands.add_parser(
+        "rollback",
+        help="Atomically reactivate the previous artifact.",
+    )
+    rollback_parser.add_argument("pack_id")
+    rollback_parser.add_argument("--store", default=str(DEFAULT_ARTIFACT_STORE))
+    rollback_parser.set_defaults(handler=run_pack_rollback)
+
+    derive_parser = pack_commands.add_parser(
+        "derive",
+        help="Create a new Pack version with exact provenance sources removed.",
+    )
+    derive_parser.add_argument("pack_dir")
+    derive_parser.add_argument("--output", required=True)
+    derive_parser.add_argument("--version", required=True)
+    derive_parser.add_argument(
+        "--exclude-source",
+        action="append",
+        required=True,
+        help="Exact provenance.source value to remove; repeat for multiple sources.",
+    )
+    derive_parser.set_defaults(handler=run_pack_derive)
 
     return parser
 
@@ -217,7 +283,7 @@ def run_dev(args: argparse.Namespace) -> int:
             print(f"Backend failed to start within {args.boot_timeout} seconds.")
             return 1
 
-        print("NeneBot dev mode is running.")
+        print("Persona Studio dev mode is running.")
         print(f"Frontend: http://localhost:{args.frontend_port}")
         print(f"Backend : http://localhost:{args.port}")
         print("Press Ctrl+C to stop.")
@@ -231,6 +297,163 @@ def run_dev(args: argparse.Namespace) -> int:
         return 0
     finally:
         terminate_processes(children)
+
+
+def _embedding_service() -> EmbeddingService:
+    from src.services.embedding_svc import EmbeddingService
+
+    return EmbeddingService()
+
+
+def run_pack_validate(args: argparse.Namespace) -> int:
+    """Validate an authored Character Pack without building an index."""
+    from src.knowledge.pack import validate_character_pack
+
+    pack = validate_character_pack(args.pack_dir)
+    print(
+        json.dumps(
+            {
+                "pack_id": pack.manifest.pack_id,
+                "version": pack.manifest.version,
+                "records": len(pack.records),
+                "evaluation_cases": len(pack.evaluation.cases),
+                "content_hash": pack.content_hash,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
+def run_pack_build(args: argparse.Namespace) -> int:
+    """Build and install an immutable artifact without changing current."""
+    from src.knowledge.builder import build_pack_artifact
+
+    published = build_pack_artifact(
+        args.pack_dir,
+        args.store,
+        _embedding_service(),
+        artifact_version=args.artifact_version,
+        activate=False,
+    )
+    print(
+        json.dumps(
+            {
+                "pack_id": published.manifest.pack_id,
+                "artifact_version": published.manifest.artifact_version,
+                "artifact_hash": published.manifest.artifact_hash,
+                "path": str(published.path),
+                "active": False,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
+def run_pack_eval(args: argparse.Namespace) -> int:
+    """Evaluate the active artifact with versioned Pack fixtures."""
+    from src.knowledge.artifacts import ArtifactStore
+    from src.knowledge.builder import evaluate_loaded_artifact, load_artifact
+    from src.knowledge.pack import validate_character_pack
+
+    pack = validate_character_pack(args.pack_dir)
+    published = ArtifactStore(args.store).resolve_current(pack.manifest.pack_id)
+    report = evaluate_loaded_artifact(
+        load_artifact(published), pack.evaluation, _embedding_service()
+    )
+    print(
+        json.dumps(
+            {
+                "pack_id": report.pack_id,
+                "artifact_hash": report.artifact_hash,
+                "passed": report.passed,
+                "results": [
+                    {
+                        "case_id": result.case_id,
+                        "passed": result.passed,
+                        "expected": result.expected_record_ids,
+                        "retrieved": result.retrieved_record_ids,
+                    }
+                    for result in report.results
+                ],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0 if report.passed else 1
+
+
+def run_pack_promote(args: argparse.Namespace) -> int:
+    """Atomically activate an installed artifact."""
+    from src.knowledge.artifacts import ArtifactStore
+
+    published = ArtifactStore(args.store).activate(args.pack_id, args.reference)
+    print(
+        json.dumps(
+            {
+                "pack_id": published.manifest.pack_id,
+                "artifact_version": published.manifest.artifact_version,
+                "artifact_hash": published.manifest.artifact_hash,
+                "active": True,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
+def run_pack_rollback(args: argparse.Namespace) -> int:
+    """Activate the artifact preceding current."""
+    from src.knowledge.artifacts import ArtifactStore
+
+    published = ArtifactStore(args.store).rollback(args.pack_id)
+    print(
+        json.dumps(
+            {
+                "pack_id": published.manifest.pack_id,
+                "artifact_version": published.manifest.artifact_version,
+                "artifact_hash": published.manifest.artifact_hash,
+                "rolled_back": True,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
+
+
+def run_pack_derive(args: argparse.Namespace) -> int:
+    """Create a validated new Pack version with selected sources removed."""
+    from src.knowledge.editor import derive_pack_without_sources
+
+    report = derive_pack_without_sources(
+        args.pack_dir,
+        args.output,
+        version=args.version,
+        excluded_sources=set(args.exclude_source),
+    )
+    print(
+        json.dumps(
+            {
+                "pack_id": report.pack.manifest.pack_id,
+                "version": report.pack.manifest.version,
+                "content_hash": report.pack.content_hash,
+                "output": str(report.pack.root),
+                "excluded_sources": report.excluded_sources,
+                "removed_record_ids": report.removed_record_ids,
+                "removed_evaluation_case_ids": report.removed_evaluation_case_ids,
+                "remaining_records": len(report.pack.records),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:

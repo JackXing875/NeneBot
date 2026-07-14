@@ -28,9 +28,12 @@ def _manifest() -> dict[str, object]:
         "display_name": "Demo Companion",
         "default_locale": "zh-CN",
         "persona_path": "persona.md",
+        "prompt_path": "prompt.md",
         "knowledge_path": "knowledge.jsonl",
+        "evaluation_path": "evaluation.json",
+        "theme_path": "theme.json",
         "provenance": {
-            "creator": "NeneBot contributors",
+            "creator": "Persona Studio contributors",
             "source": "Original test fixture",
             "license": "CC0-1.0",
             "rights": "owned",
@@ -43,7 +46,7 @@ def _record(record_id: str = "greeting-1") -> dict[str, object]:
     response = "你好，很高兴见到你。"
     tags = ["greeting"]
     provenance = {
-        "creator": "NeneBot contributors",
+        "creator": "Persona Studio contributors",
         "source": "Original test fixture line 1",
         "license": "CC0-1.0",
         "rights": "owned",
@@ -79,9 +82,39 @@ def _write_pack(root: Path, records: list[dict[str, object]] | None = None) -> P
         encoding="utf-8",
     )
     (root / "persona.md").write_text("# Demo\n\n你是一位友好的原创助手。\n", encoding="utf-8")
+    (root / "prompt.md").write_text("请以友好、诚实的方式回复。\n", encoding="utf-8")
     selected_records = records or [_record()]
     (root / "knowledge.jsonl").write_text(
         "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in selected_records),
+        encoding="utf-8",
+    )
+    (root / "evaluation.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "cases": [
+                    {
+                        "id": "greeting-eval",
+                        "query": "你好",
+                        "expected_record_ids": [selected_records[0]["id"]],
+                        "top_k": 1,
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (root / "theme.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "primary_color": "#7C83FD",
+                "accent_color": "#5EEAD4",
+                "background_color": "#111827",
+                "avatar": {"kind": "initials", "text": "D"},
+            }
+        ),
         encoding="utf-8",
     )
     return root
@@ -117,6 +150,9 @@ def test_valid_character_pack_is_content_addressed(tmp_path: Path) -> None:
     assert pack.manifest.pack_id == "demo-companion"
     assert pack.records[0].provenance.license == "CC0-1.0"
     assert pack.records[0].safety.reviewed is True
+    assert pack.prompt.startswith("请以友好")
+    assert pack.evaluation.cases[0].expected_record_ids == ["greeting-1"]
+    assert pack.theme.avatar.text == "D"
     assert len(pack.content_hash) == 64
     assert len(pack.manifest_sha256) == 64
 
@@ -154,6 +190,52 @@ def test_character_pack_rejects_record_content_tampering(tmp_path: Path) -> None
 
     with pytest.raises(PackValidationError, match="content_sha256"):
         validate_character_pack(pack_dir)
+
+
+def test_character_pack_requires_completed_safety_review(tmp_path: Path) -> None:
+    record = _record()
+    record["safety"] = {
+        "classification": "general",
+        "reviewed": False,
+        "notes": "Review still pending",
+    }
+    pack_dir = _write_pack(tmp_path / "pack", [record])
+
+    with pytest.raises(PackValidationError, match="must be safety reviewed"):
+        validate_character_pack(pack_dir)
+
+
+def test_character_pack_rejects_eval_reference_to_unknown_record(tmp_path: Path) -> None:
+    pack_dir = _write_pack(tmp_path / "pack")
+    (pack_dir / "evaluation.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "cases": [
+                    {
+                        "id": "bad-eval",
+                        "query": "你好",
+                        "expected_record_ids": ["missing-record"],
+                        "top_k": 1,
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PackValidationError, match="unknown records"):
+        validate_character_pack(pack_dir)
+
+
+def test_repository_demo_pack_is_valid_and_original() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    pack = validate_character_pack(project_root / "packs" / "demo")
+
+    assert pack.manifest.pack_id == "mira-demo"
+    assert pack.manifest.provenance.license == "CC0-1.0"
+    assert len(pack.records) == 10
+    assert len(pack.evaluation.cases) == 6
 
 
 def test_artifact_manifest_detects_tampering(tmp_path: Path) -> None:

@@ -116,45 +116,45 @@ class MetricsRegistry:
 
 registry = MetricsRegistry()
 http_requests_total = registry.counter(
-    "nenebot_http_requests_total",
-    "Total HTTP requests processed by NeneBot.",
+    "persona_studio_http_requests_total",
+    "Total HTTP requests processed by Persona Studio.",
 )
 http_request_duration_ms = registry.histogram(
-    "nenebot_http_request_duration_ms",
+    "persona_studio_http_request_duration_ms",
     "HTTP request latency in milliseconds.",
     buckets=(10, 50, 100, 250, 500, 1000, 3000, 10000),
 )
 rag_retrieval_total = registry.counter(
-    "nenebot_rag_retrieval_total",
+    "persona_studio_rag_retrieval_total",
     "Total RAG retrieval operations.",
 )
 rag_retrieval_duration_ms = registry.histogram(
-    "nenebot_rag_retrieval_duration_ms",
+    "persona_studio_rag_retrieval_duration_ms",
     "RAG retrieval latency in milliseconds.",
     buckets=(5, 10, 25, 50, 100, 250, 500, 1000),
 )
 llm_requests_total = registry.counter(
-    "nenebot_llm_requests_total",
+    "persona_studio_llm_requests_total",
     "Total LLM request attempts by provider and mode.",
 )
 llm_request_duration_ms = registry.histogram(
-    "nenebot_llm_request_duration_ms",
+    "persona_studio_llm_request_duration_ms",
     "LLM request latency in milliseconds.",
     buckets=(50, 100, 250, 500, 1000, 3000, 10000, 30000),
 )
 rate_limit_exceeded_total = registry.counter(
-    "nenebot_rate_limit_exceeded_total",
+    "persona_studio_rate_limit_exceeded_total",
     "Total requests rejected by the in-memory rate limiter.",
 )
 auth_failures_total = registry.counter(
-    "nenebot_auth_failures_total",
+    "persona_studio_auth_failures_total",
     "Total authentication failures grouped by reason.",
 )
 llm_retry_attempts_total = registry.counter(
-    "nenebot_llm_retry_attempts_total",
+    "persona_studio_llm_retry_attempts_total",
     "Total LLM retry attempts grouped by provider and failure type.",
 )
 llm_failures_total = registry.counter(
-    "nenebot_llm_failures_total",
+    "persona_studio_llm_failures_total",
     "Total LLM failures grouped by provider and terminal error type.",
 )

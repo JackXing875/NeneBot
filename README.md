@@ -1,185 +1,140 @@
 # Persona Studio
 
-> NeneBot 0.7 migration preview — a local-first, auditable Character Agent Studio and
-> Runtime.
+> A local-first, rights-aware Character Pack runtime with traceable retrieval artifacts.
 
-[中文说明](README_ch.md) · [Migration roadmap](MEMORY.md) ·
-[Character Pack v1](docs/character-packs.md)
+[中文说明](README_ch.md) · [Character Pack v1](docs/character-packs.md) ·
+[Private migration guide](docs/private-pack-migration.md) · [Roadmap](MEMORY.md)
 
-This repository is being rebuilt from a single-character RAG demo into a general platform for
-authoring, validating, testing, and running character agents. The migration is incremental: the
-0.7 branch still runs the compatibility application while new content and runtime boundaries are
-introduced alongside it.
+Persona Studio separates authored character content from the chat runtime. Persona, prompt,
+knowledge, retrieval evaluation, theme, provenance, licence and safety review live in one strict
+Character Pack. An offline builder compiles the Pack into a verified FAISS Artifact; the web and
+Telegram runtimes only read an explicitly promoted Artifact.
 
-## What exists today
+The repository includes one original, CC0-licensed demo Pack: **Mira**, a fictional night guide
+for an imaginary archive. It uses a code-native initials avatar and contains no third-party
+character art or dialogue corpus.
 
-The following describes the current 0.7 compatibility runtime, not the finished Studio:
+## Phase 1 capabilities
 
-- a FastAPI backend with the legacy `POST /v1/chat` and `POST /v1/chat/stream` APIs;
-- incremental SSE output, request limits, scoped token authentication, and operational probes;
-- a Vue/Vite chat client and an operations-oriented admin page;
-- Ollama, Anthropic, and OpenAI-compatible LLM adapters;
-- the legacy FAISS/sentence-transformers retrieval pipeline;
-- process-local session history by default, with Redis as an optional backend;
-- strict Character Pack JSON v1 validation and immutable Artifact staging/publishing helpers.
+- strict Pack validation with duplicate-key, path traversal, symlink, size and schema checks;
+- canonical per-record and whole-Pack SHA-256 hashes;
+- mandatory source, licence, rights basis and completed safety review on every knowledge record;
+- offline FAISS build with provenance preserved in retrieval metadata;
+- deterministic retrieval evaluation shipped with the Pack;
+- content-addressed Artifact versions, integrity verification, atomic promotion and rollback;
+- exact-source removal by deriving a new Pack version, followed by the same build workflow;
+- read-only `/v1/chat`, `/v1/chat/stream` and `/v1/character` runtime surfaces;
+- reference metadata in synchronous and SSE responses;
+- a code-native Vue client and read-only Artifact operations panel.
 
-Character Packs and versioned Artifacts are a foundation at this stage. They are not yet the
-default content source for `/v1/chat`, and the current front end is not yet a complete pack editor.
-The legacy RAG routes remain available as a compatibility surface while that integration is built.
+The retired online knowledge import and rebuild URLs return HTTP `410`. Content cannot bypass the
+Pack and Artifact boundary.
 
-Legacy online knowledge import and index rebuild endpoints are disabled by default. Knowledge
-should be validated and built offline, then published as an immutable Artifact. See
-[Character Pack and Artifact v1](docs/character-packs.md) for the implemented schema, provenance
-rules, integrity checks, atomic publish model, and current limitations.
+## Quick start
 
-## Where the project is going
-
-The target product is a modular, local-first Persona Studio built around one versioned Character
-Pack boundary:
-
-- persona, prompt, examples, knowledge, theme, evaluation fixtures, source, licence, and safety
-  metadata travel together;
-- an offline builder validates content and publishes a traceable, rollback-safe Artifact;
-- one Agent Kernel serves the web compatibility API and explicitly authorised transports;
-- typed events and policy-checked actions make agent behaviour replayable and auditable;
-- a Studio supports pack review, evaluation, publish, and rollback;
-- an offline group-chat simulator evaluates decisions before any real message can be sent;
-- privacy controls precede durable memory or autonomous external integrations.
-
-These items are staged goals, not claims about the current release. Progress, architectural
-decisions, and acceptance criteria live in [MEMORY.md](MEMORY.md).
-
-## Safe local quick start
-
-Prerequisites:
-
-- Python 3.10 or newer;
-- Node.js 22.12 or newer and npm;
-- a reachable LLM provider. Ollama is the default local development provider.
-
-Create an isolated backend environment and local configuration:
+Requirements: Python 3.10+, Node.js 22.12+, npm, and a reachable configured LLM provider. Ollama
+is the development default.
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 python -m pip install -r requirements.txt
+python -m pip install -e . --no-deps
 cp .env.example .env
-```
 
-On Windows, activate the environment with `venv\Scripts\activate`. Review `.env` before startup
-and configure only the provider you intend to use. Do not commit `.env` or API keys. For the
-default Ollama configuration, make sure the configured model is installed and the Ollama service
-is running.
-
-Install the locked frontend dependencies:
-
-```bash
 cd frontend
 npm ci
 cd ..
 ```
 
-Run the backend on loopback in one terminal:
+Build, evaluate and activate the demo Pack before starting the runtime:
 
 ```bash
-source venv/bin/activate
-python scripts/launch.py local --host 127.0.0.1 --reload
+persona pack validate packs/demo
+persona pack build packs/demo
+persona pack promote mira-demo 1.0.0
+persona pack eval packs/demo
 ```
 
-Run the frontend in another terminal:
+Start backend and frontend together:
 
 ```bash
-cd frontend
-npm run dev
+persona dev --host 127.0.0.1
 ```
 
-Open `http://localhost:5173`. API documentation is at `http://127.0.0.1:8000/docs`.
+Open `http://localhost:5173`. The API is on `http://127.0.0.1:8000`; API documentation is at
+`/docs`. `persona local --host 127.0.0.1` starts only the backend.
 
-To serve a production-style frontend and API from one local port, build the frontend first and
-then start the backend without `--reload`:
+## Pack release workflow
 
 ```bash
-cd frontend
-npm ci
-npm run build
-cd ..
-source venv/bin/activate
-python scripts/launch.py local --host 127.0.0.1
+# 1. Validate authored inputs.
+persona pack validate path/to/pack
+
+# 2. Install an immutable artifact without changing the active runtime.
+persona pack build path/to/pack --artifact-version 1.1.0
+
+# 3. Promote by exact version, full hash, or artifact directory name.
+persona pack promote my-pack 1.1.0
+
+# 4. Evaluate the active artifact against the Pack fixtures.
+persona pack eval path/to/pack
+
+# 5. Return to the immediately preceding installed version.
+persona pack rollback my-pack
 ```
 
-Then open `http://127.0.0.1:8000`.
+To remove records from an exact provenance source, derive a new Pack rather than mutating an
+active index:
 
-### Authentication and network exposure
-
-Authentication is off in the development example so loopback setup stays simple. Before binding
-to a non-loopback address, enable it and provide separate scoped credentials in `.env` or copy the
-registry template from [config/api_tokens.json.example](config/api_tokens.json.example):
-
-```env
-API_AUTH_ENABLED=true
-API_AUTH_TOKENS=local-chat|chat:replace-this,local-ops|ops:replace-this-too
-CORS_ALLOW_ORIGINS=https://your-ui.example
+```bash
+persona pack derive private/my-pack \
+  --exclude-source "licensed/source-a.jsonl" \
+  --output private/my-pack-1.2.0 \
+  --version 1.2.0
+persona pack build private/my-pack-1.2.0
 ```
 
-An enabled authentication configuration with no valid token fails closed. Treat all tokens as
-secrets. Production configuration also requires Redis-backed sessions; development defaults to
-ephemeral process memory.
+`private/`, `packs/private/` and generated `artifacts/` are ignored. The source Pack is never
+modified by `derive`.
 
-## Operations
+## API and operations
 
-The canonical health endpoints are:
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /v1/character` | Active Pack identity, theme and rights metadata |
+| `POST /v1/chat` | Compatibility chat API with traceable references |
+| `POST /v1/chat/stream` | SSE chat with metadata, chunks, error and done events |
+| `GET /livez` | Public process liveness |
+| `GET /readyz` | Public minimal readiness |
+| `GET /ops/health` | Protected detailed diagnostics |
+| `GET /admin/api/knowledge/overview` | Protected read-only Artifact/version view |
 
-| Endpoint | Access | Meaning |
-| --- | --- | --- |
-| `GET /livez` | Public | Minimal process liveness |
-| `GET /readyz` | Public | Minimal readiness; returns `503` when dependencies are not ready |
-| `GET /ops/health` | `ops` scope when auth is enabled | Detailed runtime diagnostics |
-
-`/health`, `/health/live`, and `/health/ready` remain deprecated compatibility aliases. Detailed
-health and metrics may reveal operational information and should not be exposed without access
-control.
+When authentication is enabled, use separate `chat` and `ops` scoped credentials. Production
+configuration requires Redis sessions. Cloud LLM providers may receive user messages, Pack
+prompts and retrieved excerpts; obtain informed consent and review provider retention terms.
 
 ## Verification
-
-After installing backend and frontend dependencies, run the repository checks with:
 
 ```bash
 ./scripts/run_linter.sh
 ```
 
-This checks formatting, linting, strict backend/script types, backend tests, and the frontend
-production build. Passing tests establishes the behaviours they cover; it does not guarantee
-factual accuracy, character fidelity, content safety, or legal permission to use a dataset.
-
-## Migration, privacy, and content rights
-
-- The repository may still contain legacy third-party character data, scripts, or artwork awaiting
-  Phase 1 migration. Treat those files as private migration inputs unless you have independently
-  verified redistribution rights. The code licence does not grant rights to third-party content.
-- Only import material you own, have licensed, or may lawfully use. Preserve source, licence,
-  rights basis, safety review, and content hashes in every Character Pack.
-- Cloud LLM providers may receive user messages, prompts, and retrieved excerpts. Obtain informed
-  consent and review the provider's retention and data-use terms before sending sensitive content.
-- The 0.7 session layer is compatibility infrastructure, not a complete privacy system. Durable
-  memory, user export/deletion, consent, and retention controls remain migration work.
-- Telegram and other external transports require explicit operator and participant authorisation.
-  Do not connect this development runtime to real communities as an autonomous agent.
-- Removing files in a future release will not erase them from Git history. History rewriting,
-  credential rotation, and public redistribution require separate operational decisions.
-
-This is an engineering migration notice, not legal advice.
+This runs Ruff formatting/linting, strict mypy, backend tests, and a production frontend build.
+Tests validate implementation contracts, not the factual accuracy or legal status of content you
+add. Only publish material you own, have licensed, or may lawfully use.
 
 ## Repository map
 
 ```text
-src/                 FastAPI compatibility runtime and new knowledge foundations
-frontend/            Vue/Vite compatibility clients
-src/knowledge/       Character Pack validation and immutable Artifact helpers
-docs/                migration-era formats and operating notes
-scripts/             launch, migration, evaluation, and repository checks
-tests/               backend and ASGI regression tests
-MEMORY.md            long-lived roadmap, decisions, and implementation log
+packs/demo/          Original public demo Pack
+src/knowledge/       Pack, builder, Artifact store and runtime contracts
+src/                 FastAPI runtime and adapters
+frontend/            Pack-driven chat and read-only operations UI
+docs/                Format and private migration guidance
+tests/               Unit, ASGI and end-to-end contract tests
+MEMORY.md            Long-lived roadmap and implementation record
 ```
 
-The source code is distributed under [GPL-3.0](LICENSE). Review content rights separately from the
-software licence.
+Source code is licensed under [GPL-3.0](LICENSE). Pack content carries its own explicit licence
+and provenance.

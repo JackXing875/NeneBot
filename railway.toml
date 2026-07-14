@@ -1,14 +1,10 @@
 [build]
 builder = "NIXPACKS"
-# Install Python deps, then build the Vue frontend into frontend/dist
-buildCommand = "pip install -r requirements.txt && cd frontend && npm ci && npm run build && cd .."
+# Build the UI and a verified immutable demo Artifact during deployment.
+buildCommand = "pip install -r requirements.txt && cd frontend && npm ci && npm run build && cd .. && python -m src.cli pack validate packs/demo && python -m src.cli pack build packs/demo && python -m src.cli pack promote mira-demo 1.0.0"
 
 [deploy]
 # FastAPI serves both the API (/v1/*) and the compiled frontend (/)
 startCommand = "uvicorn src.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/readyz"
-healthcheckTimeout = 300  # Allow time for embedding model download on first deploy
-
-[[volumes]]
-# Persist the vector index and HuggingFace model cache across deploys
-mountPath = "/app/vector_store"
+healthcheckTimeout = 300

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "======================================================="
-echo "       NeneBot - Automated Linux Environment Setup"
+echo "       Persona Studio - Linux Environment Setup"
 echo "======================================================="
 echo ""
 
@@ -69,19 +69,22 @@ source venv/bin/activate
 echo "[INFO] Installing backend dependencies..."
 pip install --upgrade pip -q
 pip install -r requirements.txt -q
+pip install -e . --no-deps -q
 
 echo "[OK] Backend dependencies installed."
 
 echo "[5/5] Setting up frontend interface..."
 
 cd frontend || exit 1
-npm install --silent
+npm ci --silent
 cd ..
 
 echo "[OK] Frontend dependencies installed."
 
-echo "[INFO] Initializing vector database..."
-python scripts/init_vector_db.py
+echo "[INFO] Building the original demo Character Pack artifact..."
+persona pack validate packs/demo
+persona pack build packs/demo
+persona pack promote mira-demo 1.0.0
 
 echo ""
 echo "======================================================="

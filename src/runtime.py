@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 from src.core.config import settings
 from src.core.logger import setup_logger
 from src.core.tracing import setup_tracing, tracing_available
 from src.infrastructure.llm_base import BaseLLMClient
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
+from src.knowledge.artifacts import ArtifactStore, PublishedArtifact
+from src.knowledge.builder import load_artifact
+from src.knowledge.runtime import RuntimeCharacter
 from src.services.embedding_svc import EmbeddingService
 from src.services.rag_pipeline import RAGPipeline
 from src.services.session_store import InMemorySessionStore, SessionStore
@@ -27,6 +29,8 @@ class RuntimeServices:
     rag_pipeline: RAGPipeline
     llm_client: BaseLLMClient
     session_store: SessionStore
+    character: RuntimeCharacter | None = None
+    artifact: PublishedArtifact | None = None
 
 
 def create_llm_client() -> BaseLLMClient:
@@ -90,44 +94,32 @@ def check_session_backend(store: SessionStore) -> tuple[bool, str | None]:
         return False, str(exc)
 
 
-def ensure_index_exists() -> None:
-    """Require a prebuilt index outside development and test environments."""
-    index_path = Path(settings.vector_index_path)
-    meta_path = Path(settings.knowledge_meta_path)
-
-    if index_path.exists() and meta_path.exists():
-        return
-
-    if settings.app_env in {"staging", "prod"}:
-        raise RuntimeError(
-            "The configured knowledge artifact is missing. Build and publish it offline "
-            "before starting a staging or production runtime."
-        )
-
-    logger.info("Vector index not found – building from scratch (this may take a minute)...")
-    from scripts.init_vector_db import main as build_index
-
-    build_index()
-    logger.info("Vector index build complete.")
-
-
 def build_runtime_services() -> RuntimeServices:
     """Instantiate the core services used by chat endpoints and adapters."""
     if settings.tracing_enabled:
         setup_tracing()
         logger.info(f"Tracing enabled: available={tracing_available()}")
 
-    ensure_index_exists()
-
+    artifact_store = ArtifactStore(settings.artifact_store_path)
+    try:
+        published = artifact_store.resolve_current(settings.active_pack_id)
+        loaded = load_artifact(published)
+    except Exception as exc:
+        raise RuntimeError(
+            "No valid active Character Pack artifact is available. Run `persona pack build`, "
+            "then `persona pack promote`, before starting the runtime."
+        ) from exc
+    if published.manifest.embedding_model != settings.embedding_model_name:
+        raise RuntimeError(
+            "The active artifact embedding model does not match EMBEDDING_MODEL_NAME; "
+            "rebuild the Pack artifact before starting."
+        )
     embedding_svc = EmbeddingService()
-    vector_store = FaissVectorStore(
-        dimension=settings.vector_dim,
-        index_path=settings.vector_index_path,
-        meta_path=settings.knowledge_meta_path,
-    )
+    vector_store = loaded.vector_store
     rag_pipeline = RAGPipeline(
         vector_store=vector_store,
         embedding_svc=embedding_svc,
+        character=loaded.character,
     )
     llm_client = create_llm_client()
     session_store = create_session_store()
@@ -138,4 +130,6 @@ def build_runtime_services() -> RuntimeServices:
         rag_pipeline=rag_pipeline,
         llm_client=llm_client,
         session_store=session_store,
+        character=loaded.character,
+        artifact=published,
     )

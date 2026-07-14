@@ -10,6 +10,8 @@ from typing import Any
 from src.core.config import settings
 from src.core.request_context import get_request_id
 from src.infrastructure.vector_store.faiss_impl import FaissVectorStore
+from src.knowledge.artifacts import PublishedArtifact
+from src.knowledge.runtime import RuntimeCharacter
 
 
 class JsonFormatter(logging.Formatter):
@@ -68,6 +70,8 @@ def build_health_payload(
     session_backend_name: str,
     session_backend_ok: bool,
     session_backend_error: str | None = None,
+    character: RuntimeCharacter | None = None,
+    artifact: PublishedArtifact | None = None,
 ) -> dict[str, object]:
     """Build the standard health payload returned by `/health`."""
     llm_model = settings.effective_llm_model
@@ -86,7 +90,7 @@ def build_health_payload(
     payload: dict[str, object] = {
         "status": "ok" if ready else "degraded",
         "ready": ready,
-        "service": "nenebot",
+        "service": "persona-studio",
         "llm_provider": settings.llm_provider,
         "llm_model": llm_model,
         "session_backend": {
@@ -116,6 +120,18 @@ def build_health_payload(
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
+    if character is not None and artifact is not None:
+        payload["pack"] = {
+            "status": "active",
+            "pack_id": character.pack_id,
+            "pack_version": character.pack_version,
+            "pack_content_hash": character.pack_content_hash,
+            "artifact_version": artifact.manifest.artifact_version,
+            "artifact_hash": artifact.manifest.artifact_hash,
+        }
+    else:
+        payload["pack"] = {"status": "unavailable"}
+
     if session_backend_error:
         session_backend = payload["session_backend"]
         if isinstance(session_backend, dict):
@@ -128,7 +144,7 @@ def build_liveness_payload() -> dict[str, object]:
     """Build a lightweight liveness payload for process health checks."""
     return {
         "status": "ok",
-        "service": "nenebot",
+        "service": "persona-studio",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

@@ -43,15 +43,18 @@ WORKDIR /app
 COPY --from=python-builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Application code
+# Application code and the only public Character Pack source.
 COPY src/ ./src/
-COPY scripts/ ./scripts/
-COPY data/ ./data/
+COPY packs/ ./packs/
 
 # Compiled frontend
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
-RUN chown -R appuser:appuser /app
+# Build and activate the immutable demo artifact before dropping privileges.
+RUN python -m src.cli pack validate /app/packs/demo && \
+    python -m src.cli pack build /app/packs/demo --store /app/artifacts && \
+    python -m src.cli pack promote mira-demo 1.0.0 --store /app/artifacts && \
+    chown -R appuser:appuser /app
 
 USER appuser
 

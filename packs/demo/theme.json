@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "primary_color": "#7C83FD",
+  "accent_color": "#5EEAD4",
+  "background_color": "#111827",
+  "avatar": {
+    "kind": "initials",
+    "text": "M"
+  }
+}

@@ -13,7 +13,7 @@ from src.infrastructure.vector_store.base import BaseVectorStore
 logger = logging.getLogger(__name__)
 
 # Bump this version string whenever the index format changes.
-# A mismatch will prompt the user to re-run scripts/init_vector_db.py.
+# A mismatch requires a fresh immutable Character Pack artifact build.
 _INDEX_VERSION = "v2-cosine"
 
 
@@ -51,16 +51,15 @@ class FaissVectorStore(BaseVectorStore):
         if isinstance(stored, list):
             # Old v1 flat-list format (L2 index) – incompatible.
             logger.warning(
-                "Detected legacy L2 index (v1). "
-                "Please re-run `python scripts/init_vector_db.py` "
-                "to rebuild with cosine similarity."
+                "Detected an unsupported legacy L2 index. "
+                "Rebuild and promote the Character Pack artifact."
             )
             return
 
         if stored.get("version") != _INDEX_VERSION:
             logger.warning(
                 f"Index version mismatch ({stored.get('version')!r} vs {_INDEX_VERSION!r}). "
-                "Please re-run `python scripts/init_vector_db.py`."
+                "Rebuild and promote the Character Pack artifact."
             )
             return
 

@@ -13,11 +13,11 @@ def setup_logger() -> logging.Logger:
     """Initializes the global logger with standard industrial formatting."""
     root = logging.getLogger()
     if root.handlers:
-        return logging.getLogger("NeneBot")
+        return logging.getLogger("PersonaStudio")
 
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(JsonFormatter())
 
     root.setLevel(settings.log_level)
     root.handlers = [handler]
-    return logging.getLogger("NeneBot")
+    return logging.getLogger("PersonaStudio")

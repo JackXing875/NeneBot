@@ -1,10 +1,10 @@
-# NeneBot 重构长期记忆
+# Persona Studio 重构长期记忆
 
 > 本文件是本项目重构的持续上下文与执行契约。后续工作开始前先阅读本文件，完成一项后同步更新状态、决策和验证结果。
 
-最后更新：2026-07-13  
+最后更新：2026-07-14
 当前分支：`fix/mypy-debt`  
-当前阶段：Phase 0 已完成 — 按用户要求暂停在 Phase 1 前
+当前阶段：Phase 1 已完成 — 下一入口为 Phase 2 AgentKernel 与可靠存储
 
 ## 1. 最终产品方向
 
@@ -20,7 +20,7 @@ NeneBot 不再继续扩张为一个绑定单一版权角色的 RAG 聊天 Demo�
 - 群聊 Agent 离线回放模拟器；
 - 明确授权后再接入 Telegram、OneBot 等真实渠道。
 
-现有 Nene 内容只作为本地私有迁移对象，不应继续成为公共发行物的默认数据。现有 `data/prompts.yaml` 中的群聊 Agent 草案保留其产品思想，但不会直接接线到生产运行时。
+原公共第三方角色语料、美术和专用处理代码已在 Phase 1 从当前工作树清退；如迁移操作者拥有自己的合法内容，应按 `docs/private-pack-migration.md` 在 Git 忽略的私有目录中重新建立 Pack。
 
 ## 2. 不可变的架构原则
 
@@ -74,10 +74,10 @@ packs/
   demo/
     manifest.json
     persona.md
-    prompt.yaml
+    prompt.md
     knowledge.jsonl
-    eval.yaml
-    theme/
+    evaluation.json
+    theme.json
 ```
 
 只有确有多个实现的边界才保留 Protocol：LLM provider、event/conversation store、transport 和 tool。FAISS 若保留，只是可选的 ExampleRetriever，不再成为整个应用的中心。
@@ -140,12 +140,12 @@ packs/
 ### Phase 1 — Character Pack 与内容边界
 
 - [x] 定义严格 `manifest.json` 与 knowledge schema：id/version/source/license/safety/逐条 content hash；JSON 是刻意选择，以避免 YAML 隐式类型/额外依赖并支持 canonical hash。
-- [ ] 创建原创或明确许可的最小 demo Pack，保住端到端基线。
-- [ ] 将第三方 Nene 语料和美术移出公共发行物，提供本地私有迁移说明。
-- [ ] 将 persona/prompt/examples/theme/eval 统一从 Pack 加载，消灭多套 prompt 真相。
-- [ ] 合并五段数据脚本为 `persona pack validate/build/eval/promote`。
-- [x] 建立临时目录 + 不可变版本目录 + 原子 `current.json` 指针的 artifact 基础，记录 Pack/file hash、模型、维度、schema/build 版本和 provenance；真实 embedding builder 尚未迁入。
-- [ ] 全链路保留 provenance，支持按 source 删除和重建。
+- [x] 创建原创、CC0-1.0 的 Mira demo Pack，保住端到端基线。
+- [x] 将公共第三方角色语料和美术移出当前发行工作树，提供本地私有迁移说明。
+- [x] 将 persona/prompt、作为示例的 knowledge trigger/response、theme/eval 统一从 Pack 加载，消灭多套 prompt 真相。
+- [x] 合并数据工具链为 `persona pack validate/build/eval/promote/rollback/derive`。
+- [x] 建立临时目录 + 不可变版本目录 + 原子 `current.json` 指针和 per-Pack 排他发布锁；真实 embedding builder 记录 Pack/file hash、模型、维度、版本和 provenance。
+- [x] 全链路保留 provenance；`derive --exclude-source` 支持按精确 source 派生、重建和回滚。
 
 验收：公共发行物不含未授权演示内容；demo Pack 可验证、构建、对话、展示引用并安全回滚。
 
@@ -260,3 +260,20 @@ packs/
 - 最终验证：`scripts/run_linter.sh` 通过；Ruff format/lint 覆盖 82 files；Mypy strict 覆盖 53 source files；`156 passed`（仅 5 个既有 FAISS/SWIG 弃用警告）；`npm ci` clean install、Vite 7.3.6 production build、`npm audit --audit-level=high`（0 vulnerabilities）与 `git diff --check` 全部通过。
 - 环境限制：已尝试 `docker build --check`，但当前主机 Docker daemon/socket 不存在，无法执行镜像层级验证。这不改变已完成的 Dockerfile/context 防泄漏修复，后续可在有 daemon 的 CI 或开发机补跑。
 - 用户当前只要求 Phase 0；Phase 1 及以后保持暂停。已落下的 Character Pack/Artifact 骨架仅作为下一阶段安全接口，不代表 Phase 1 已整体完成。
+
+### 2026-07-14 — Phase 1 完成
+
+- Character Pack 成为唯一内容边界：manifest 强制 persona、prompt、knowledge、evaluation、theme 和 Pack provenance；所有 JSON 严格拒绝未知字段/重复 key，路径禁止穿越与 symlink，文本有 UTF-8/NUL/size 限制。
+- 每条 knowledge record 强制唯一 id/content hash、来源/许可证/权利基础与 `reviewed=true` 安全结论；Pack content hash 覆盖全部六个源文件。
+- 新增原创 Mira demo Pack（10 条知识、6 条检索 fixtures、CC0-1.0、代码原生 initials 主题），公共运行时和前端不再依赖角色位图。
+- 实现真实离线 builder：embedding → FAISS + 带 record/content/Pack/provenance/safety 的 metadata → runtime/evaluation 文件 → 全文件 hash Artifact manifest → 完整复验后安装。
+- Artifact Store 支持 build 不激活、原子 promote、严格 resolve、版本列表、上一版本 rollback 和 per-Pack fail-closed 发布锁；运行时缺失、模型不匹配或 Artifact 篡改均拒绝启动，且启动不重建/写入。
+- `/v1/chat` 与 `/v1/chat/stream` 由 Artifact 中的 persona/prompt/知识驱动，references 返回 record id、content hash、Pack version、source、license 与 safety；新增 `/v1/character` 提供当前 Pack 身份/主题/权利信息。
+- Admin 改为只读 Pack/Artifact/版本视图；旧 online import/rebuild URL 固定 410。Vue 对话页读取当前 Pack，支持 SSE error/references；运维页删除在线导入/重建 UI。
+- 新增 `persona pack validate/build/eval/promote/rollback/derive`；`derive --exclude-source` 精确删除来源记录、同步裁剪评测，并在临时目录复验后原子生成新 Pack，源 Pack 不变。
+- Docker、Compose、Railway、Linux/Windows setup 和中英文 README 统一到离线 Pack 构建/发布；生成 Artifact、私有 Pack 与私有迁移目录默认不进 Git。
+- 从当前工作树删除旧 `data/` 路线/翻译/训练集、旧向量索引、角色 GIF/PNG、五段专用数据脚本、专用 tagging/evaluation/admin mutation 模块及对应测试；未执行 Git 历史重写。
+- 自动化验证：Ruff、strict mypy 和全套后端测试通过（加入 Phase 1 E2E 后 148 tests）；前端 production build 通过；`git diff --check` 通过。
+- 真实模型验收：缓存的 `BAAI/bge-small-zh-v1.5` 成功构建 10 records / 512 dimensions Artifact，6/6 fixtures 通过；安装并 promote 1.0.0，随后构建/promote 1.1.0，再成功 rollback 到 1.0.0。网络 HEAD 被 sandbox 拒绝后按设计回退本地 cache，不影响构建结果。
+- 环境限制延续：主机没有 Docker daemon，因此本轮更新后的镜像层级构建仍无法本地验证；Dockerfile/context 与部署命令由静态检查和仓库门禁覆盖，镜像 smoke 留给有 daemon 的 CI。
+- 下一入口：Phase 2，用单一 AgentKernel 替代 chat orchestration/RAG compatibility glue，并引入 SQLite event/conversation/inbox/outbox 与隐私生命周期。

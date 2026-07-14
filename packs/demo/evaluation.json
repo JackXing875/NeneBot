@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "eval-greeting",
+      "query": "你好，第一次见面。",
+      "expected_record_ids": ["greeting-first"],
+      "top_k": 3
+    },
+    {
+      "id": "eval-identity",
+      "query": "你是谁？",
+      "expected_record_ids": ["identity-mira"],
+      "top_k": 3
+    },
+    {
+      "id": "eval-privacy",
+      "query": "你会记住我的秘密吗？",
+      "expected_record_ids": ["privacy-boundary"],
+      "top_k": 3
+    },
+    {
+      "id": "eval-provenance",
+      "query": "为什么知识要记录来源？",
+      "expected_record_ids": ["source-traceability"],
+      "top_k": 3
+    },
+    {
+      "id": "eval-rollback",
+      "query": "如果新知识有问题怎么办？",
+      "expected_record_ids": ["publish-rollback"],
+      "top_k": 3
+    },
+    {
+      "id": "eval-uncertainty",
+      "query": "你不知道答案时会怎么做？",
+      "expected_record_ids": ["uncertainty-honesty"],
+      "top_k": 3
+    }
+  ]
+}

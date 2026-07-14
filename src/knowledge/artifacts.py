@@ -351,6 +351,25 @@ def _atomic_write(path: Path, content: bytes) -> None:
         temporary_path.unlink(missing_ok=True)
 
 
+@contextmanager
+def _exclusive_publish_lock(pack_root: Path) -> Iterator[None]:
+    """Fail closed when another process is publishing the same Pack."""
+    lock_path = pack_root / ".publish.lock"
+    try:
+        descriptor = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as exc:
+        raise ArtifactValidationError(
+            f"Another artifact publish is already active for {pack_root.name}."
+        ) from exc
+    try:
+        os.write(descriptor, f"pid={os.getpid()}\n".encode("ascii"))
+        os.fsync(descriptor)
+        yield
+    finally:
+        os.close(descriptor)
+        lock_path.unlink(missing_ok=True)
+
+
 def write_artifact_manifest(manifest: ArtifactManifest, artifact_dir: str | Path) -> Path:
     """Atomically write the canonical manifest into a staged artifact directory."""
     root = Path(artifact_dir)
@@ -453,8 +472,37 @@ class ArtifactStore:
             if stage.exists():
                 shutil.rmtree(stage)
 
-    def publish(self, staged_dir: str | Path) -> PublishedArtifact:
-        """Move a verified stage into immutable versions, then atomically activate it."""
+    def _published_from_path(self, path: Path) -> PublishedArtifact:
+        manifest = verify_artifact_directory(path)
+        manifest_path = path / ARTIFACT_MANIFEST_FILENAME
+        return PublishedArtifact(
+            path=path,
+            manifest=manifest,
+            manifest_sha256=_sha256_file(manifest_path),
+        )
+
+    def _activate_locked(
+        self,
+        pack_root: Path,
+        published: PublishedArtifact,
+    ) -> PublishedArtifact:
+        pointer = CurrentArtifactPointer(
+            schema_version=ARTIFACT_SCHEMA_VERSION,
+            artifact_hash=published.manifest.artifact_hash,
+            artifact_version=published.manifest.artifact_version,
+            relative_path=published.path.relative_to(pack_root).as_posix(),
+            manifest_sha256=published.manifest_sha256,
+        )
+        _atomic_write(pack_root / CURRENT_POINTER_FILENAME, _canonical_model_bytes(pointer))
+        return published
+
+    def publish(
+        self,
+        staged_dir: str | Path,
+        *,
+        activate: bool = True,
+    ) -> PublishedArtifact:
+        """Install a verified stage and optionally atomically activate it."""
         stage = Path(staged_dir)
         manifest = verify_artifact_directory(stage)
         pack_root = self._pack_root(manifest.pack_id, create=True)
@@ -463,33 +511,85 @@ class ArtifactStore:
                 "Artifacts may only be published from this store's stage()."
             )
 
-        versions_root = pack_root / "versions"
-        versions_root.mkdir(exist_ok=True)
-        destination = versions_root / (f"{manifest.artifact_version}-{manifest.artifact_hash[:12]}")
-        if destination.exists():
-            existing = verify_artifact_directory(destination)
-            if existing.artifact_hash != manifest.artifact_hash:
-                raise ArtifactValidationError(f"Artifact version collision at {destination}.")
-            shutil.rmtree(stage)
-        else:
-            os.replace(stage, destination)
-            _fsync_directory(versions_root)
+        with _exclusive_publish_lock(pack_root):
+            versions_root = pack_root / "versions"
+            versions_root.mkdir(exist_ok=True)
+            destination = versions_root / (
+                f"{manifest.artifact_version}-{manifest.artifact_hash[:12]}"
+            )
+            if destination.exists():
+                existing = verify_artifact_directory(destination)
+                if existing.artifact_hash != manifest.artifact_hash:
+                    raise ArtifactValidationError(f"Artifact version collision at {destination}.")
+                shutil.rmtree(stage)
+            else:
+                os.replace(stage, destination)
+                _fsync_directory(versions_root)
 
-        manifest_path = destination / ARTIFACT_MANIFEST_FILENAME
-        manifest_sha256 = _sha256_file(manifest_path)
-        pointer = CurrentArtifactPointer(
-            schema_version=ARTIFACT_SCHEMA_VERSION,
-            artifact_hash=manifest.artifact_hash,
-            artifact_version=manifest.artifact_version,
-            relative_path=destination.relative_to(pack_root).as_posix(),
-            manifest_sha256=manifest_sha256,
-        )
-        _atomic_write(pack_root / CURRENT_POINTER_FILENAME, _canonical_model_bytes(pointer))
-        return PublishedArtifact(
-            path=destination,
-            manifest=manifest,
-            manifest_sha256=manifest_sha256,
-        )
+            published = self._published_from_path(destination)
+            if activate:
+                return self._activate_locked(pack_root, published)
+            return published
+
+    def list_versions(self, pack_id: str) -> list[PublishedArtifact]:
+        """Return every verified immutable version without mutating the store."""
+        pack_root = self._pack_root(pack_id, create=False)
+        versions_root = pack_root / "versions"
+        if not versions_root.is_dir() or versions_root.is_symlink():
+            return []
+        versions: list[PublishedArtifact] = []
+        for path in sorted(versions_root.iterdir(), key=lambda item: item.name):
+            if not path.is_dir() or path.is_symlink():
+                raise ArtifactValidationError(f"Invalid entry in artifact versions: {path}.")
+            published = self._published_from_path(path)
+            if published.manifest.pack_id != pack_id:
+                raise ArtifactValidationError(f"Artifact Pack id mismatch at {path}.")
+            versions.append(published)
+        return versions
+
+    def activate(self, pack_id: str, reference: str) -> PublishedArtifact:
+        """Atomically activate one installed version by dir, hash, or exact version."""
+        pack_root = self._pack_root(pack_id, create=False)
+        with _exclusive_publish_lock(pack_root):
+            candidates = [
+                item
+                for item in self.list_versions(pack_id)
+                if reference
+                in {
+                    item.path.name,
+                    item.manifest.artifact_hash,
+                    item.manifest.artifact_version,
+                }
+            ]
+            if not candidates:
+                raise ArtifactValidationError(
+                    f"No installed artifact for Pack {pack_id!r} matches {reference!r}."
+                )
+            if len(candidates) > 1:
+                raise ArtifactValidationError(
+                    f"Artifact reference {reference!r} is ambiguous; "
+                    "use its full hash or directory."
+                )
+            return self._activate_locked(pack_root, candidates[0])
+
+    def rollback(self, pack_id: str) -> PublishedArtifact:
+        """Activate the version immediately preceding the current artifact."""
+        pack_root = self._pack_root(pack_id, create=False)
+        with _exclusive_publish_lock(pack_root):
+            current = self.resolve_current(pack_id)
+            versions = sorted(
+                self.list_versions(pack_id),
+                key=lambda item: (item.manifest.created_at, item.path.name),
+            )
+            current_index = next(
+                (index for index, item in enumerate(versions) if item.path == current.path),
+                None,
+            )
+            if current_index is None or current_index == 0:
+                raise ArtifactValidationError(
+                    f"No previous artifact is available for Pack {pack_id}."
+                )
+            return self._activate_locked(pack_root, versions[current_index - 1])
 
     def resolve_current(self, pack_id: str) -> PublishedArtifact:
         """Resolve and re-verify the currently active immutable artifact."""
